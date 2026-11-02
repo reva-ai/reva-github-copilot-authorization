@@ -81,3 +81,7 @@ commit `dist/src/` with every source change.
 | [Configuration](docs/CONFIGURATION.md) | Every setting, where each is read from (`settings.json` or environment), your identity, and what blocks |
 | [Troubleshooting](docs/TROUBLESHOOTING.md) | The debug log, common problems, VS Code checks, and known limitations |
 | [Security](SECURITY.md) | What is sent and kept, credentials, failure behaviour |
+
+## License
+
+[Apache-2.0](LICENSE). See [NOTICE](NOTICE).
