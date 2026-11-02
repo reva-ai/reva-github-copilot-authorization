@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      {
+        "type": "command",
+        "bash": "node dist/src/sessionStart.js",
+        "powershell": "node dist/src/sessionStart.js",
+        "cwd": "${PLUGIN_ROOT}",
+        "timeoutSec": 10
+      }
+    ],
+    "sessionEnd": [
+      {
+        "type": "command",
+        "bash": "node dist/src/sessionEnd.js",
+        "powershell": "node dist/src/sessionEnd.js",
+        "cwd": "${PLUGIN_ROOT}",
+        "timeoutSec": 5
+      }
+    ],
+    "userPromptSubmitted": [
+      {
+        "type": "command",
+        "bash": "node dist/src/authorizePrompt.js",
+        "powershell": "node dist/src/authorizePrompt.js",
+        "cwd": "${PLUGIN_ROOT}",
+        "timeoutSec": 30
+      }
+    ],
+    "preToolUse": [
+      {
+        "type": "command",
+        "bash": "node dist/src/authorize.js",
+        "powershell": "node dist/src/authorize.js",
+        "cwd": "${PLUGIN_ROOT}",
+        "timeoutSec": 45
+      }
+    ],
+    "postToolUse": [
+      {
+        "type": "command",
+        "bash": "node dist/src/authorizePost.js",
+        "powershell": "node dist/src/authorizePost.js",
+        "cwd": "${PLUGIN_ROOT}",
+        "timeoutSec": 45
+      }
+    ]
+  }
+}

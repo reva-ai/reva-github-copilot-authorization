@@ -1,0 +1,17 @@
+node_modules/
+dist/test/
+.env
+*.log
+.cursor/
+findings/
+**/.cursor/
+**/findings/
+.cursorignore
+.cursorindexingignore
+AGENTS.md
+agents.md
+**/.cursorignore
+**/.cursorindexingignore
+**/AGENTS.md
+**/agents.md
+/.idea/

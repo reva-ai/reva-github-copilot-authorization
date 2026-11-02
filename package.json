@@ -1,0 +1,19 @@
+{
+  "name": "reva-security",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Reva Security — enterprise governance for every GitHub Copilot CLI tool call and prompt",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "postinstall": "npm run build",
+    "test": "npm run build && node --test dist/test/*.test.js",
+    "mock-rtg": "node scripts/mock-rtg-server.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "typescript": "^5.5.4"
+  }
+}
