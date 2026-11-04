@@ -85,8 +85,5 @@ function loadConfig(env = process.env, settingsPath) {
         timeoutMs: Number(env.REVA_PDP_TIMEOUT_MS) || DEFAULT_TIMEOUT_MS,
         ingestionUrl,
         ingestionTimeoutMs: Number(env.REVA_INGESTION_TIMEOUT_MS) || DEFAULT_INGESTION_TIMEOUT_MS,
-        // settings.json env / top-level / reva{} first, then the process env.
-        modelContext: fromSettings.modelContext ||
-            ['1', 'true', 'yes', 'on'].includes((env.REVA_MODEL_CONTEXT || '').trim().toLowerCase()),
     };
 }

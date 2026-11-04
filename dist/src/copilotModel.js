@@ -34,6 +34,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.resolveCopilotHome = resolveCopilotHome;
+exports.readEvents = readEvents;
 exports.resolveCopilotModel = resolveCopilotModel;
 const fs = __importStar(require("node:fs"));
 const os = __importStar(require("node:os"));
@@ -65,6 +66,7 @@ const SUBAGENT_CONFIGURED = '"subagent.configured"';
 function resolveCopilotHome(env = process.env) {
     return env.COPILOT_HOME?.trim() || path.join(os.homedir(), '.copilot');
 }
+// Shared with copilotMcp.ts, which reads the same record for MCP calls.
 function readEvents(sessionId, copilotHome) {
     if (!sessionId)
         return [];

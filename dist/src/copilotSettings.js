@@ -104,9 +104,6 @@ function readDisabledMcpServers(settingsPath) {
     const list = readCopilotJsonc(settingsPath || resolveCopilotSettingsPath())?.disabledMcpServers;
     return Array.isArray(list) ? list.filter((n) => typeof n === 'string') : [];
 }
-function truthy(value) {
-    return value !== undefined && ['1', 'true', 'yes', 'on'].includes(value.toLowerCase());
-}
 function pickString(...vals) {
     for (const v of vals) {
         if (typeof v === 'string' && v.trim())
@@ -151,11 +148,6 @@ function readCopilotSettingsReva(settingsPath) {
             // read) — the same address the store knows.
             userEmail: pickString(settingsEnv.REVA_USER_EMAIL, parsed.REVA_USER_EMAIL, nested.userEmail, nested.user_email, nested.REVA_USER_EMAIL),
             debug: debugFlag || undefined,
-            modelContext: truthy(pickString(settingsEnv.REVA_MODEL_CONTEXT, parsed.REVA_MODEL_CONTEXT, nested.modelContext)) ||
-                settingsEnv.REVA_MODEL_CONTEXT === true ||
-                parsed.REVA_MODEL_CONTEXT === true ||
-                nested.modelContext === true ||
-                undefined,
         };
     }
     catch {

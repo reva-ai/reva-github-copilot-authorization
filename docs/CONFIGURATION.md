@@ -18,7 +18,6 @@ without reinstalling.
 | `REVA_HOST` | no | `api.reva.ai` | Your Reva tenant's API host. |
 | `REVA_USER_EMAIL` | no | your public GitHub email | The user's identity. Set it when your GitHub email is private — Copilot's sign-in cannot read a private address, and without one the plugin falls back to your OS username. It must be the address your token belongs to. |
 | `REVA_DEBUG` | no | off | Set to `1` to log each decision to stderr and append it, timestamped, to `reva-debug.log` in the plugin's data directory (`~/.copilot-governance/` if the host gives the plugin none). |
-| `REVA_MODEL_CONTEXT` | no | off | Set to `1` to add the model Copilot ran to every request's context. Enable it only once your Reva schema declares `model`; before that, every request is rejected as a schema violation. |
 | `REVA_PDP_TIMEOUT_MS` | no | `25000` | Timeout for an evaluation call. On timeout the plugin fails **closed** — the action is blocked. Environment only. |
 | `REVA_INGESTION_TIMEOUT_MS` | no | `5000` | Timeout for session-start ingestion. Deliberately much shorter — ingestion is best-effort and never gates an action. Environment only. |
 | `REVA_SESSION_ENTRYPOINT` | no | detected | Names the surface when nothing else identifies it — see [DESKTOP-COMPATIBILITY.md](DESKTOP-COMPATIBILITY.md). Environment only. |

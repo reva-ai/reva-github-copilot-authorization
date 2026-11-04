@@ -13,7 +13,7 @@ export function buildInvokeAgentRequest(
   activeSessionCount = 0,
   currentSession?: ActiveSession,
   machineId?: string,
-  modelExtras: Pick<ActionContextExtras, 'model' | 'modelContext'> = {},
+  modelExtras: Pick<ActionContextExtras, 'model'> = {},
 ): CedarRequest {
   // User's schema-declared SCIM attributes have no trustworthy source in
   // this hook, so send a bare direct spec and let RTG resolve the provisioned

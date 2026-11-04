@@ -74,10 +74,9 @@ function activeSessionFields(extras) {
         agentType: ingestionClient_1.AGENT_TYPE,
         machineId: extras.machineId ?? '',
         os: osAttribute(),
-        // Gated: Cedar context is closed, so `model` may
-        // only be sent once the schema declares it on every action — sending it
-        // earlier turns every request into a schema-violation deny.
-        ...(extras.modelContext ? { model: extras.model ?? '' } : {}),
+        // Always sent, so a decision log records which model made each call.
+        // Cedar context is closed: the schema must declare `model` on every action.
+        model: extras.model ?? '',
     };
 }
 function buildActionContext(mapping, extras = {}) {

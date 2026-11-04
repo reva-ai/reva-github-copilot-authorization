@@ -15,11 +15,12 @@ const CONTEXT_KEYS = [
   'agentType',
   'machineId',
   'os',
+  'model',
   'hops',
   'timestamp',
 ].sort();
 
-test('invokeAgent context includes session scalars, agentType GitHubCopilot, machineId, and os', () => {
+test('invokeAgent context includes session scalars, agentType GitHubCopilot, machineId, os, and model', () => {
   const ctx = buildInvokeAgentContext();
   assert.deepEqual(Object.keys(ctx).sort(), CONTEXT_KEYS);
   assert.deepEqual(ctx.hops, []);
@@ -41,13 +42,12 @@ test('osAttribute reports Windows, macOS, and Linux for other Unix-likes', () =>
   }
 });
 
-test('model is sent only when modelContext is on', () => {
+test('model is always sent, empty when it cannot be read', () => {
   const mapping: CedarActionMapping = { actionName: 'read', resourceType: 'File', resourceId: '/repo/a.ts' };
-  assert.equal('model' in buildActionContext(mapping, { model: 'gpt-6-luna' }), false);
-  assert.equal(buildActionContext(mapping, { model: 'gpt-6-luna', modelContext: true }).model, 'gpt-6-luna');
-  assert.equal(buildActionContext(mapping, { modelContext: true }).model, '');
-  assert.equal(buildInvokeAgentContext(0, undefined, undefined, { model: 'claude-sonnet-5.5', modelContext: true }).model, 'claude-sonnet-5.5');
-  assert.equal('model' in buildInvokeAgentContext(0, undefined, undefined, { model: 'claude-sonnet-5.5' }), false);
+  assert.equal(buildActionContext(mapping, { model: 'gpt-6-luna' }).model, 'gpt-6-luna');
+  assert.equal(buildActionContext(mapping).model, '');
+  assert.equal(buildInvokeAgentContext(0, undefined, undefined, { model: 'claude-sonnet-5.5' }).model, 'claude-sonnet-5.5');
+  assert.equal(buildInvokeAgentContext(0).model, '');
 });
 
 test('os is present on every action, using the real current platform', () => {

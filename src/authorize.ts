@@ -39,7 +39,12 @@ async function main(): Promise<void> {
   );
   const activeSessionCount = getActiveSessionCount(cfg.agentId, pluginDataDir);
 
-  const toolMapping = mapToolCall(input.tool_name, input.tool_input || {}, input.cwd);
+  // An MCP call's server is read from Copilot's session record — the hook's
+  // own session first, then the root's (see copilotMcp.ts). authorizePost.ts
+  // passes the same ids, so a pre/post pair maps to the same resource.
+  const toolMapping = mapToolCall(input.tool_name, input.tool_input || {}, input.cwd, {
+    sessionIds: [input.session_id, sessionId],
+  });
 
   // A shell command naming more distinct paths than one call evaluates:
   // denied rather than evaluated partially or widened to a common ancestor,
@@ -149,7 +154,6 @@ async function main(): Promise<void> {
         currentSession,
         machineId,
         model,
-        modelContext: cfg.modelContext,
       }),
       transmission,
       session,

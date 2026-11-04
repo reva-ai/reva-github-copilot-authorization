@@ -8,7 +8,6 @@ export type CopilotSettingsReva = {
   agentId?: string;
   userEmail?: string;
   debug?: boolean;
-  modelContext?: boolean;
 };
 
 // Copilot settings.json is JSONC. Strip // and /* */ comments before JSON.parse.
@@ -71,10 +70,6 @@ export function readCopilotJsonc(file: string): Record<string, any> | undefined 
 export function readDisabledMcpServers(settingsPath?: string): string[] {
   const list = readCopilotJsonc(settingsPath || resolveCopilotSettingsPath())?.disabledMcpServers;
   return Array.isArray(list) ? list.filter((n): n is string => typeof n === 'string') : [];
-}
-
-function truthy(value: string | undefined): boolean {
-  return value !== undefined && ['1', 'true', 'yes', 'on'].includes(value.toLowerCase());
 }
 
 function pickString(...vals: unknown[]): string | undefined {
@@ -149,11 +144,6 @@ export function readCopilotSettingsReva(settingsPath?: string): CopilotSettingsR
         nested.REVA_USER_EMAIL,
       ),
       debug: debugFlag || undefined,
-      modelContext: truthy(pickString(settingsEnv.REVA_MODEL_CONTEXT, parsed.REVA_MODEL_CONTEXT, nested.modelContext)) ||
-        settingsEnv.REVA_MODEL_CONTEXT === true ||
-        parsed.REVA_MODEL_CONTEXT === true ||
-        nested.modelContext === true ||
-        undefined,
     };
   } catch {
     return {};

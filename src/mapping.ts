@@ -1,6 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { parseApplyPatchTargets, patchTextOf } from './applyPatch';
+import { resolveCopilotMcpTool } from './copilotMcp';
 import { resolveMcpServerIdentity } from './mcpServerIdentity';
 import { resolvePluginDataDir } from './pluginData';
 import { extractShellTargets, literalDirOf, MAX_SHELL_RESOURCES, resolveAgainst } from './shellTargets';
@@ -131,10 +132,39 @@ function pathFromInput(toolInput: Record<string, any>, cwd: string, fallback = c
   return resolveAgainst(cwd, String(raw));
 }
 
+// One MCP tool call: invokeTool on Tool::"<server-slug>/<tool>", child of
+// MCPServer::"<server-slug>" — the slug discovery ingests, so the parent
+// points at an entity that exists. Fully fault-tolerant inside (see
+// mcpServerIdentity.ts): this runs on the PreToolUse path, where authorize.ts
+// fails CLOSED, so a cache miss must degrade to the raw token and never throw.
+function mcpToolMapping(serverToken: string, tool: string): CedarActionMapping {
+  const server = resolveMcpServerIdentity(serverToken, resolvePluginDataDir());
+  const label = server.displayName || server.slug;
+  return {
+    actionName: 'invokeTool',
+    resourceType: 'Tool',
+    resourceId: `${server.slug}/${tool}`,
+    resourceProperties: {
+      name: tool,
+      description: `MCP tool "${tool}" on server "${label}"`,
+      connectionType: 'mcp',
+    },
+    resourceParents: [{ type: 'MCPServer', id: server.slug }],
+  };
+}
+
+export interface MapOptions {
+  // Copilot session records to look an MCP call up in (copilotMcp.ts): the
+  // hook's own session id, then the root session's. Without them only the
+  // configured servers are used to recognize a "<server>-<tool>" name.
+  sessionIds?: string[];
+}
+
 export function mapToolToCedar(
   toolName: string,
   toolInput: Record<string, any>,
   cwd: string,
+  options: MapOptions = {},
 ): CedarActionMapping {
   if (SHELL_TOOLS.has(toolName)) {
     // Single-resource view: the first path the command touches. The hooks use
@@ -235,26 +265,13 @@ export function mapToolToCedar(
     const parts = toolName.startsWith('mcp__') ? toolName.split('__') : toolName.split('/');
     const token = parts[1] || 'unknown-server';
     const tool = parts.slice(2).join(toolName.startsWith('mcp__') ? '__' : '/') || toolName;
-
-    // Resolve to the same slug discovery ingests, so the MCPServer parent
-    // below points at an entity that actually exists. Fully fault-tolerant
-    // inside (see mcpServerIdentity.ts): this runs on the PreToolUse path,
-    // where authorize.ts fails CLOSED, so a cache miss must degrade to the
-    // raw token and never throw.
-    const server = resolveMcpServerIdentity(token, resolvePluginDataDir());
-    const label = server.displayName || server.slug;
-    return {
-      actionName: 'invokeTool',
-      resourceType: 'Tool',
-      resourceId: `${server.slug}/${tool}`,
-      resourceProperties: {
-        name: tool,
-        description: `MCP tool "${tool}" on server "${label}"`,
-        connectionType: 'mcp',
-      },
-      resourceParents: [{ type: 'MCPServer', id: server.slug }],
-    };
+    return mcpToolMapping(token, tool);
   }
+
+  // Copilot's own MCP naming, "<server>-<tool>" (arxiv-search_papers). Only
+  // reached by names that are not a known built-in above.
+  const mcp = resolveCopilotMcpTool({ toolName, sessionIds: options.sessionIds || [], cwd });
+  if (mcp) return mcpToolMapping(mcp.server, mcp.tool);
 
   return {
     actionName: 'invokeTool',
@@ -273,7 +290,12 @@ export function mapToolToCedar(
 // both ends — each evaluated on its own (evaluateAll.ts). A patch whose
 // envelope names no file yields no mappings, which the hooks fail closed on:
 // a mutation with an unknown target must not pass.
-export function mapToolCall(toolName: string, toolInput: Record<string, any>, cwd: string): ToolMapping {
+export function mapToolCall(
+  toolName: string,
+  toolInput: Record<string, any>,
+  cwd: string,
+  options: MapOptions = {},
+): ToolMapping {
   if (APPLY_PATCH_TOOLS.has(toolName)) {
     const targets = parseApplyPatchTargets(patchTextOf(toolInput), cwd);
     return {
@@ -303,5 +325,5 @@ export function mapToolCall(toolName: string, toolInput: Record<string, any>, cw
     }
     return { mappings: targets.map((absolute) => shellMapping(absolute, cwd, command)) };
   }
-  return { mappings: [mapToolToCedar(toolName, toolInput, cwd)] };
+  return { mappings: [mapToolToCedar(toolName, toolInput, cwd, options)] };
 }

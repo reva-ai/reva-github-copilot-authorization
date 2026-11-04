@@ -10,13 +10,6 @@ export interface RevaConfig {
   timeoutMs: number;
   ingestionUrl: string;
   ingestionTimeoutMs: number;
-  // When true, every action's Cedar context also carries `model` — the model
-  // Copilot ran for that call (copilotModel.ts) — so a decision log records
-  // WHICH model made each call. OFF BY DEFAULT: Cedar
-  // context is closed, and sending `model` before the schema declares it on
-  // every action turns every request into a schema-violation deny. The
-  // Agent entity's `models` Set is recorded regardless.
-  modelContext?: boolean;
 }
 
 // Normalized internal shape — Copilot may deliver camelCase (native CLI) or

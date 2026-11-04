@@ -27,7 +27,11 @@ async function main() {
     const sessionId = caller.sessionId;
     const activeSessionCount = (0, activeSessions_1.getActiveSessionCount)(cfg.agentId, pluginDataDir);
     const currentSession = (0, activeSessions_1.getSessionEntry)(cfg.agentId, sessionId, pluginDataDir);
-    const toolMapping = (0, mapping_1.mapToolCall)(input.tool_name, input.tool_input || {}, input.cwd);
+    // Same session ids as authorize.ts, so an MCP call maps to the same
+    // Tool + MCPServer resource as its PreToolUse request.
+    const toolMapping = (0, mapping_1.mapToolCall)(input.tool_name, input.tool_input || {}, input.cwd, {
+        sessionIds: [input.session_id, sessionId],
+    });
     // PreToolUse already denied a patch whose files could not be determined, so
     // this only happens if the host ran it anyway; nothing identifiable to
     // evaluate, and PostToolUse cannot undo the tool.
@@ -89,7 +93,6 @@ async function main() {
                 currentSession,
                 machineId,
                 model,
-                modelContext: cfg.modelContext,
             }),
             transmission,
             session,
