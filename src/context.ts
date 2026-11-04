@@ -15,10 +15,9 @@ export interface ActionContextExtras {
   activeSessionCount?: number;
   currentSession?: ActiveSession;
   machineId?: string;
-  // The model Copilot is running for this call (copilotModel.ts). Sent only
-  // when modelContext is on — see RevaConfig.modelContext.
+  // The model Copilot is running for this call (copilotModel.ts); '' when it
+  // cannot be read.
   model?: string;
-  modelContext?: boolean;
 }
 
 function activeTurnEvidence(extras: ActionContextExtras): Record<string, any> {
@@ -54,10 +53,9 @@ function activeSessionFields(extras: ActionContextExtras): Record<string, any> {
     agentType: AGENT_TYPE,
     machineId: extras.machineId ?? '',
     os: osAttribute(),
-    // Gated: Cedar context is closed, so `model` may
-    // only be sent once the schema declares it on every action — sending it
-    // earlier turns every request into a schema-violation deny.
-    ...(extras.modelContext ? { model: extras.model ?? '' } : {}),
+    // Always sent, so a decision log records which model made each call.
+    // Cedar context is closed: the schema must declare `model` on every action.
+    model: extras.model ?? '',
   };
 }
 
@@ -90,7 +88,7 @@ export function buildInvokeAgentContext(
   activeSessionCount = 0,
   currentSession?: ActiveSession,
   machineId?: string,
-  extras: Pick<ActionContextExtras, 'model' | 'modelContext'> = {},
+  extras: Pick<ActionContextExtras, 'model'> = {},
 ): Record<string, any> {
   return {
     timestamp: Date.now(),

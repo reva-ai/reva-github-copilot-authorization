@@ -114,6 +114,7 @@ describe('loadConfig', () => {
     const cfg = loadConfig({ REVA_AUTH_TOKEN: 'env-tok', REVA_AGENT_ID: 'agent-e' }, file);
     assert.equal(cfg.authorization, 'env-tok');
   });
+
 });
 
 describe('readCopilotSettingsReva', () => {

@@ -19,6 +19,7 @@ handles credentials, and when it blocks or lets actions through.
   - session id and timestamp;
   - the chain of agents and sub-agents that led to the action;
   - the surface (`cli`, `ide-<editor>`, `Copilot Desktop`) and the operating system;
+  - the model Copilot used for that call;
   - your operating system's own machine id (on Windows the `MachineGuid`), or none if it
     cannot be read — never a made-up one;
   - how many sessions are active on this machine.

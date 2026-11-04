@@ -108,7 +108,7 @@ async function main(): Promise<void> {
     activeSessionCount,
     currentSession,
     resolveMachineId(pluginDataDir),
-    { model, modelContext: cfg.modelContext },
+    { model },
   );
 
   debugLog(`-> invokeAgent as ${userEmail} on Agent:${cfg.agentId}${model ? ` (model=${model})` : ''}`);

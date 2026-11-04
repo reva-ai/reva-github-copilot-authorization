@@ -32,7 +32,8 @@ export function resolveCopilotHome(env: NodeJS.ProcessEnv = process.env): string
   return env.COPILOT_HOME?.trim() || path.join(os.homedir(), '.copilot');
 }
 
-function readEvents(sessionId: string, copilotHome: string): string[] {
+// Shared with copilotMcp.ts, which reads the same record for MCP calls.
+export function readEvents(sessionId: string, copilotHome: string): string[] {
   if (!sessionId) return [];
   const safe = sessionId.replace(/[^a-zA-Z0-9_-]/g, '_');
   try {

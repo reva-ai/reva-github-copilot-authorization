@@ -80,7 +80,7 @@ async function main() {
     // The model Copilot routed this prompt to (Auto resolves it before this
     // hook fires). Read from Copilot's own session record — see copilotModel.ts.
     const model = (0, copilotModel_1.resolveCopilotModel)({ sessionId: input.session_id });
-    const request = (0, invokeAgent_1.buildInvokeAgentRequest)(userEmail, cfg.agentId, prompt || '(empty prompt)', (0, turnCache_1.directSessionFromTurn)(input.session_id, turn), activeSessionCount, currentSession, (0, deviceId_1.resolveMachineId)(pluginDataDir), { model, modelContext: cfg.modelContext });
+    const request = (0, invokeAgent_1.buildInvokeAgentRequest)(userEmail, cfg.agentId, prompt || '(empty prompt)', (0, turnCache_1.directSessionFromTurn)(input.session_id, turn), activeSessionCount, currentSession, (0, deviceId_1.resolveMachineId)(pluginDataDir), { model });
     (0, debug_1.debugLog)(`-> invokeAgent as ${userEmail} on Agent:${cfg.agentId}${model ? ` (model=${model})` : ''}`);
     // Agent.models is recorded alongside the evaluation, not before it, so a
     // new model adds no latency to the prompt. Best-effort; never throws.

@@ -43,11 +43,14 @@ Start a new `copilot` session and ask it to do something that uses a tool, such 
 | `glob` | `glob` |
 | `grep`, `rg` | `grep` |
 | `task` (sub-agents) | `spawn` |
-| MCP tools and anything else | `invokeTool` |
+| MCP tools (`<server>-<tool>`) | `invokeTool` on `Tool::"<server>/<tool>"`, under `MCPServer::"<server>"` |
+| Anything else | `invokeTool` |
 
 Your prompts are evaluated as `invokeAgent`. Every request also tells Reva which surface the
 session runs on (`cli`, `ide-<editor>`, `Copilot Desktop`), the model in use, and the chain of
-agents that led to the action.
+agents that led to the action. The model travels as `context.model` on every action, so your Reva
+schema must declare `model` on every action — otherwise every request is rejected as a schema
+violation.
 
 ## What blocks, and what doesn't
 

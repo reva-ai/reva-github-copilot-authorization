@@ -31,7 +31,12 @@ async function main() {
     const sessionId = caller.sessionId;
     const currentSession = (0, activeSessions_1.markSessionActive)(cfg.agentId, sessionId, (0, identity_1.resolveSessionEntrypointForSession)({ agentId: cfg.agentId, sessionId, pluginDataDir }), pluginDataDir);
     const activeSessionCount = (0, activeSessions_1.getActiveSessionCount)(cfg.agentId, pluginDataDir);
-    const toolMapping = (0, mapping_1.mapToolCall)(input.tool_name, input.tool_input || {}, input.cwd);
+    // An MCP call's server is read from Copilot's session record — the hook's
+    // own session first, then the root's (see copilotMcp.ts). authorizePost.ts
+    // passes the same ids, so a pre/post pair maps to the same resource.
+    const toolMapping = (0, mapping_1.mapToolCall)(input.tool_name, input.tool_input || {}, input.cwd, {
+        sessionIds: [input.session_id, sessionId],
+    });
     // A shell command naming more distinct paths than one call evaluates:
     // denied rather than evaluated partially or widened to a common ancestor,
     // either of which would let a narrower path policy be bypassed.
@@ -126,7 +131,6 @@ async function main() {
                 currentSession,
                 machineId,
                 model,
-                modelContext: cfg.modelContext,
             }),
             transmission,
             session,

@@ -119,8 +119,10 @@ block never leave your machine.
 - A shell command that names more than 10 distinct paths is denied rather than evaluated
   partially — split it into smaller commands. An `apply_patch` whose patch names no file
   is denied too, because its target cannot be authorized.
-- Copilot names MCP tools `<server>-<tool>`; these are evaluated as a generic `invokeTool`
-  on that tool name, without the MCP server as their parent.
+- An MCP call's server is read from Copilot's session record, or else matched against the
+  servers configured in `.mcp.json`, `.github/mcp.json` and `~/.copilot/mcp-config.json`.
+  When neither identifies it (for example a server that is only configured in VS Code), the
+  call is evaluated as a generic `invokeTool` on the tool name, without an `MCPServer` parent.
 - In VS Code Copilot Chat, tools that only exist in VS Code are evaluated as a generic
   `invokeTool`.
 - Directory registration happens in the background at session start and is best-effort.

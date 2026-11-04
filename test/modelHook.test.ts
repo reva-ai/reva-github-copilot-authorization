@@ -96,10 +96,10 @@ async function withDirs(fn: (dirs: { data: string; home: string; copilotHome: st
   }
 }
 
-test('with REVA_MODEL_CONTEXT on, the prompt request carries the model and Agent.models records it', async () => {
+test('the prompt request carries the model and Agent.models records it', async () => {
   await withDirs(async (dirs) => {
     await withReva(async (host, seen) => {
-      await runPrompt(host, dirs, { REVA_MODEL_CONTEXT: '1' });
+      await runPrompt(host, dirs);
       assert.equal(seen.evaluations.length, 1);
       assert.equal(seen.evaluations[0].context.model, 'gpt-6-luna');
       assert.deepEqual(
@@ -110,16 +110,11 @@ test('with REVA_MODEL_CONTEXT on, the prompt request carries the model and Agent
   });
 });
 
-test('with REVA_MODEL_CONTEXT off (default), no model in context — Agent.models is still recorded', async () => {
+test('REVA_MODEL_CONTEXT is no longer read: setting it to 0 still sends the model', async () => {
   await withDirs(async (dirs) => {
     await withReva(async (host, seen) => {
-      await runPrompt(host, dirs);
-      assert.equal('model' in seen.evaluations[0].context, false);
-      assert.equal(seen.evaluations[0].context.os, process.platform === 'darwin' ? 'macOS' : process.platform === 'win32' ? 'Windows' : 'Linux');
-      assert.deepEqual(
-        seen.patches.filter((p) => p.attributeValue?.name === 'models').map((p) => p.attributeValue.value),
-        ['gpt-6-luna'],
-      );
+      await runPrompt(host, dirs, { REVA_MODEL_CONTEXT: '0' });
+      assert.equal(seen.evaluations[0].context.model, 'gpt-6-luna');
     });
   });
 });
