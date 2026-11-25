@@ -18,7 +18,7 @@ without reinstalling.
 | `REVA_HOST` | no | `api.reva.ai` | Your Reva tenant's API host. |
 | `REVA_USER_EMAIL` | no | your public GitHub email | The user's identity. Set it when your GitHub email is private — Copilot's sign-in cannot read a private address, and without one the plugin falls back to your OS username. It must be the address your token belongs to. |
 | `REVA_DEBUG` | no | off | Set to `1` to log each decision to stderr and append it, timestamped, to `reva-debug.log` in the plugin's data directory (`~/.copilot-governance/` if the host gives the plugin none). |
-| `REVA_PDP_TIMEOUT_MS` | no | `25000` | Timeout for an evaluation call. On timeout the plugin fails **closed** — the action is blocked. Environment only. |
+| `REVA_PDP_TIMEOUT_MS` | no | `25000` | Timeout for an evaluation call. On timeout the plugin fails **closed** — the action is blocked. The end-of-turn summarize call uses the shorter of this and 5 s, and never blocks. Environment only. |
 | `REVA_INGESTION_TIMEOUT_MS` | no | `5000` | Timeout for session-start ingestion. Deliberately much shorter — ingestion is best-effort and never gates an action. Environment only. |
 | `REVA_SESSION_ENTRYPOINT` | no | detected | Names the surface when nothing else identifies it — see [DESKTOP-COMPATIBILITY.md](DESKTOP-COMPATIBILITY.md). Environment only. |
 | `REVA_COPILOT_CONFIG_PATH` | no | `~/.copilot/config.json` | Overrides where the plugin reads your Copilot sign-in from. Intended for tests. |
@@ -56,7 +56,8 @@ identifier for this agent and make sure the matching entity exists in your Reva 
 `REVA_HOST` accepts a bare host (`api.example.reva.ai`) or one with a scheme, which is
 stripped. Trailing slashes are removed. Paths are fixed in code:
 
-- evaluation: `/pdp/v2/ai/evaluation`
+- evaluation: `/pdp/ai/access/v1/ai/evaluation`
+- trace summary, at the end of a turn: `/pdp/ai/access/v1/ai/trace/summarize`
 - ingestion: `/ingestion/v2`
 
 The scheme is **HTTPS for every host** except `localhost`, `127.0.0.1` and `[::1]`, which
@@ -74,6 +75,7 @@ A short version of the table in [SECURITY.md](../SECURITY.md#what-blocks-and-wha
 | Token rejected (401) | **passes through for the rest of that session** — fails open |
 | Payload too large (413) | **passes through** — fails open |
 | `REVA_AUTH_TOKEN` or `REVA_AGENT_ID` missing | **blocked, every action** — fails closed |
+| End-of-turn summarize fails | ignored — never blocks |
 
 Governance holds through a Reva-side outage: an unreachable or erroring RTG blocks rather
 than silently letting actions through. The exceptions are a rejected token (401), which

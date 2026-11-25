@@ -93,6 +93,8 @@ test('osFamily: windows / macos / linux, anything else passes through', () => {
 
 const cfg: RevaConfig = {
   rtgUrl: 'https://pdp.test/evaluate',
+  pluginVersionUrl: 'https://pdp.test/pdp/ai/access/v1/ai/plugin/version',
+  summarizeUrl: 'https://pdp.test/pdp/ai/access/v1/ai/trace/summarize',
   authorization: 't',
   agentId: 'agent-1',
   timeoutMs: 1000,

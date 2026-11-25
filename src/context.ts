@@ -1,31 +1,29 @@
 import * as nodeOs from 'node:os';
 import { ActiveSession } from './activeSessions';
 import { AGENT_TYPE } from './ingestionClient';
-import {
-  CedarActionMapping,
-  CedarHop,
-  DirectEvalConversationMessage,
-  DirectEvalTransmission,
-} from './types';
+import { CedarActionMapping, DirectEvalTransmission } from './types';
 
+// Sent as the invokeAgent userQuery. An RTG 413 fails open for that request,
+// so raise this only after confirming the RTG accepts the resulting request
+// size.
+const MAX_PROMPT_LENGTH = 10000;
+
+export function truncatePrompt(prompt: string): string {
+  return prompt.length > MAX_PROMPT_LENGTH ? `${prompt.slice(0, MAX_PROMPT_LENGTH)}…` : prompt;
+}
+
+// Reva owns thread history for guardrail evaluators (the earlier hops of this
+// trace and the earlier prompts of the thread). The plugin therefore sends no
+// `context.hops`, `context.conversation` or `session.messages`: if the caller
+// supplies them Reva keeps them and does not attach what it recorded.
 export interface ActionContextExtras {
   subagentIndex?: number;
-  hops?: CedarHop[];
-  conversationMessages?: DirectEvalConversationMessage[];
   activeSessionCount?: number;
   currentSession?: ActiveSession;
   machineId?: string;
   // The model Copilot is running for this call (copilotModel.ts); '' when it
   // cannot be read.
   model?: string;
-}
-
-function activeTurnEvidence(extras: ActionContextExtras): Record<string, any> {
-  const messages = extras.conversationMessages || [];
-  return {
-    hops: extras.hops || [],
-    ...(messages.length > 0 ? { conversation: { messages } } : {}),
-  };
 }
 
 // The OS this call runs on, sent as context.os on every action. macOS is
@@ -64,23 +62,22 @@ export function buildActionContext(
   extras: ActionContextExtras = {},
 ): Record<string, any> {
   const timestamp = Date.now();
-  const evidence = activeTurnEvidence(extras);
   const sessions = activeSessionFields(extras);
   switch (mapping.actionName) {
     case 'invokeTool':
-      return { timestamp, ...evidence, ...sessions };
+      return { timestamp, ...sessions };
     case 'spawn':
-      return { timestamp, subagentIndex: extras.subagentIndex ?? 1, ...evidence, ...sessions };
+      return { timestamp, subagentIndex: extras.subagentIndex ?? 1, ...sessions };
     case 'executeBash':
-      return { timestamp, command: mapping.command ?? '', ...evidence, ...sessions };
+      return { timestamp, command: mapping.command ?? '', ...sessions };
     case 'read':
     case 'write':
     case 'edit':
     case 'glob':
     case 'grep':
-      return { timestamp, ...evidence, ...sessions };
+      return { timestamp, ...sessions };
     default:
-      return { timestamp, ...evidence, ...sessions };
+      return { timestamp, ...sessions };
   }
 }
 
@@ -92,7 +89,6 @@ export function buildInvokeAgentContext(
 ): Record<string, any> {
   return {
     timestamp: Date.now(),
-    hops: [],
     ...activeSessionFields({ activeSessionCount, currentSession, machineId, ...extras }),
   };
 }
@@ -119,9 +115,8 @@ export function serializeToolResponse(toolResponse: unknown): string {
     : raw;
 }
 
-// userQuery is the same current-hop prompt PreToolUse sent, so a pre/post
-// pair shows one prompt,
-// and the tool's output travels separately in transmission.response.
+// userQuery is the same prompt PreToolUse sent, so a pre/post pair shows one
+// prompt, and the tool's output travels separately in transmission.response.
 export function buildToolResponseTransmission(toolResponse: unknown, userQuery: string): DirectEvalTransmission {
   const transmission = buildTransmission(userQuery, 'tool');
   transmission.response = serializeToolResponse(toolResponse);

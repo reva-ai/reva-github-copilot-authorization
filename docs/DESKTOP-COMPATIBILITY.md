@@ -57,6 +57,21 @@ Two consequences follow, and both are tested:
   editor markers or `REVA_SESSION_ENTRYPOINT` in its environment.
 
 
+## End of a turn
+
+The plugin registers an `agentStop` hook, which Copilot fires when the main agent finishes a
+turn (a sub-agent's end is a separate `subagentStop` event, which the plugin does not use).
+It closes that prompt's trace in Reva so the trace summary can be written. Copilot's reference
+lists the same event as `agentStop` in the CLI's camelCase payload (`sessionId`,
+`transcriptPath`) and as `Stop` in the VS Code-compatible snake_case payload (`session_id`,
+`transcript_path`); the plugin reads both. Neither carries the assistant's reply, so the
+request holds the trace id and session id only; the reply is sent only if a host adds it to
+the input. The hook is best-effort, prints nothing, and always exits 0.
+
+It is tested against the documented payloads and a local stand-in for Reva. It has not been
+observed on a live desktop app or VS Code session; if `agentStop` does not appear in
+`reva-debug.log` there, the turn's trace is simply left unsummarized.
+
 ## What a hook does on an excluded surface
 
 Nothing runs. Copilot on github.com and the cloud coding agent run on GitHub's servers and
@@ -78,8 +93,9 @@ session target. The plugin has no exclusion list: every surface that loads it is
 | Precedence | the desktop app over editor markers and `REVA_SESSION_ENTRYPOINT`; an editor (environment or parent process) over `REVA_SESSION_ENTRYPOINT` |
 
 On top of that, the hook tests drive the real hook entry points as subprocesses against a
-local stand-in for Reva and check that a 200 allows and a 403 denies, and the configuration
-tests check that a missing `REVA_AUTH_TOKEN` or agent id is rejected.
+local stand-in for Reva and check that a 200 allows and a 403 denies, that the end-of-turn
+hook sends the turn's trace id and never blocks, and the configuration tests check that a
+missing `REVA_AUTH_TOKEN` or agent id is rejected.
 
 ## Rollout
 

@@ -1,6 +1,7 @@
 import {
   PostToolUseInput,
   PreToolUseInput,
+  StopInput,
   UserPromptSubmitInput,
 } from './types';
 
@@ -90,5 +91,23 @@ export function normalizeSessionStart(raw: Record<string, any>): {
     session_id: pickString(raw.sessionId, raw.session_id) || 'unknown-session',
     cwd: pickString(raw.cwd) || process.cwd(),
     source: pickString(raw.source, raw.trigger),
+  };
+}
+
+/**
+ * Normalize Copilot CLI agentStop (camelCase) or VS Code Stop (snake_case).
+ * Copilot documents sessionId / transcriptPath / stopReason / stop_hook_active
+ * for it. The assistant's reply is read only if the host supplies it under
+ * the names Copilot documents for subagentStop (`response`, or
+ * `last_assistant_message` in the VS Code format).
+ */
+export function normalizeStop(raw: Record<string, any>): StopInput {
+  return {
+    session_id: pickString(raw.sessionId, raw.session_id) || 'unknown-session',
+    cwd: pickString(raw.cwd) || process.cwd(),
+    hook_event_name: pickString(raw.hook_event_name, raw.hookEventName) || 'agentStop',
+    transcript_path: pickString(raw.transcriptPath, raw.transcript_path),
+    stop_hook_active: typeof raw.stop_hook_active === 'boolean' ? raw.stop_hook_active : undefined,
+    last_assistant_message: pickString(raw.last_assistant_message, raw.response),
   };
 }

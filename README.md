@@ -46,11 +46,18 @@ Start a new `copilot` session and ask it to do something that uses a tool, such 
 | MCP tools (`<server>-<tool>`) | `invokeTool` on `Tool::"<server>/<tool>"`, under `MCPServer::"<server>"` |
 | Anything else | `invokeTool` |
 
-Your prompts are evaluated as `invokeAgent`. Every request also tells Reva which surface the
-session runs on (`cli`, `ide-<editor>`, `Copilot Desktop`), the model in use, and the chain of
-agents that led to the action. The model travels as `context.model` on every action, so your Reva
+Your prompts are evaluated as `invokeAgent`: the first 10,000 characters of each are sent to
+Reva, and none of the text is stored on your machine. Every request also tells Reva which surface the
+session runs on (`cli`, `ide-<editor>`, `Copilot Desktop`), the model in use, and which
+sub-agent made the call when one did. The plugin sends no hop chain and no conversation
+history: Reva records the chain of agents that led to an action, and the earlier prompts of
+the thread, itself. The model travels as `context.model` on every action, so your Reva
 schema must declare `model` on every action — otherwise every request is rejected as a schema
 violation.
+
+When Copilot finishes a turn, the plugin tells Reva that turn's trace is complete (the
+`agentStop` hook, `POST /pdp/ai/access/v1/ai/trace/summarize`) so Reva can write its summary. This is
+best-effort: it never blocks Copilot or changes what it does, and a failure is ignored.
 
 ## What blocks, and what doesn't
 

@@ -49,7 +49,6 @@ const activeSessions_1 = require("./activeSessions");
 const copilotAccount_1 = require("./copilotAccount");
 const copilotSettings_1 = require("./copilotSettings");
 const deviceId_1 = require("./deviceId");
-const hopChain_1 = require("./hopChain");
 const pluginData_1 = require("./pluginData");
 const subAgentRegistry_1 = require("./subAgentRegistry");
 // Precedence: process env (CI / one-off) → ~/.copilot/settings.json →
@@ -315,6 +314,8 @@ function resolveAgentContext(configuredAgentId, hookInput) {
 //   2. Subagent in the Claude-compatible payload shape — same session_id
 //      plus agent_id on the input.
 //   3. The top-level agent.
+// Who is calling is all this decides: the delegation chain is recorded by
+// Reva, not tracked here.
 function resolveCaller(configuredAgentId, hookInput, pluginDataDir) {
     const registered = (0, subAgentRegistry_1.resolveSubAgent)(hookInput.session_id, pluginDataDir);
     if (registered) {
@@ -324,17 +325,11 @@ function resolveCaller(configuredAgentId, hookInput, pluginDataDir) {
             subAgentId: registered.subAgentId,
             subAgentType: registered.agentType,
             sessionId: registered.rootSessionId,
-            hops: registered.lineage,
-            hopSessionId: hookInput.session_id,
         };
     }
     const agentCtx = resolveAgentContext(configuredAgentId, hookInput);
     return {
         ...agentCtx,
         sessionId: hookInput.session_id,
-        hops: agentCtx.isSubAgent
-            ? (0, hopChain_1.resolveSubAgentLineage)(hookInput.session_id, agentCtx.subAgentId, pluginDataDir)
-            : (0, hopChain_1.loadAgentHops)(hookInput.session_id, pluginDataDir),
-        hopSessionId: hookInput.session_id,
     };
 }

@@ -143,11 +143,25 @@ const server = http.createServer((req, res) => {
     // Real Reva backend route — part of the public API contract, so it has
     // to match what the client actually requests (config.ts's RTG_PATH is the
     // same fixed route — see there).
-    if (url.pathname === '/pdp/v2/ai/evaluation' && req.method === 'POST') {
+    if (url.pathname === '/pdp/ai/access/v1/ai/evaluation' && req.method === 'POST') {
       console.log('\n--- Reva mock RTG received a direct-AI request ---');
       console.log('headers:', JSON.stringify(redactedHeaders(req)));
       console.log('body:', JSON.stringify(parsed, null, 2));
       evaluationReply(res);
+      return;
+    }
+
+    // Closes one prompt trace at the end of a turn (the agentStop hook). 202 is
+    // what the real endpoint answers; the output text is not echoed to the log.
+    if (url.pathname === '/pdp/ai/access/v1/ai/trace/summarize' && req.method === 'POST') {
+      console.log('\n--- Reva mock RTG: POST /pdp/ai/access/v1/ai/trace/summarize ---');
+      console.log('headers:', JSON.stringify(redactedHeaders(req)));
+      console.log(
+        'body:',
+        JSON.stringify({ ...parsed, ...(parsed?.output ? { output: `<${Buffer.byteLength(parsed.output)} bytes>` } : {}) }, null, 2),
+      );
+      res.writeHead(202, { 'Content-Type': 'application/json' });
+      res.end('{}');
       return;
     }
 

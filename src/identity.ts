@@ -4,10 +4,8 @@ import { getSessionEntry, recordSessionEditor } from './activeSessions';
 import { resolveCopilotAccountEmail } from './copilotAccount';
 import { readCopilotSettingsReva } from './copilotSettings';
 import { readGithubEmail } from './deviceId';
-import { loadAgentHops, resolveSubAgentLineage } from './hopChain';
 import { resolvePluginDataDir } from './pluginData';
 import { resolveSubAgent } from './subAgentRegistry';
-import { CedarHop } from './types';
 
 // Precedence: process env (CI / one-off) → ~/.copilot/settings.json →
 // the Copilot account's public email (copilotAccount.ts: looked up once with
@@ -306,12 +304,6 @@ export interface CallerContext extends AgentContext {
   // the circuit breaker, active-session bookkeeping and spawn counting all
   // key off this — so every subagent's calls land in the user's session.
   sessionId: string;
-  // The chain before this call's own action.
-  hops: CedarHop[];
-  // Where a spawn made by THIS caller queues its child's lineage: the
-  // caller's own hook sessionId, which is what the child's kickoff reports
-  // as parentAgentId.
-  hopSessionId: string;
 }
 
 // One place that decides who is calling for preToolUse / postToolUse:
@@ -320,6 +312,8 @@ export interface CallerContext extends AgentContext {
 //   2. Subagent in the Claude-compatible payload shape — same session_id
 //      plus agent_id on the input.
 //   3. The top-level agent.
+// Who is calling is all this decides: the delegation chain is recorded by
+// Reva, not tracked here.
 export function resolveCaller(
   configuredAgentId: string,
   hookInput: { session_id: string; agent_id?: string; agent_type?: string },
@@ -333,8 +327,6 @@ export function resolveCaller(
       subAgentId: registered.subAgentId,
       subAgentType: registered.agentType,
       sessionId: registered.rootSessionId,
-      hops: registered.lineage,
-      hopSessionId: hookInput.session_id,
     };
   }
 
@@ -342,9 +334,5 @@ export function resolveCaller(
   return {
     ...agentCtx,
     sessionId: hookInput.session_id,
-    hops: agentCtx.isSubAgent
-      ? resolveSubAgentLineage(hookInput.session_id, agentCtx.subAgentId!, pluginDataDir)
-      : loadAgentHops(hookInput.session_id, pluginDataDir),
-    hopSessionId: hookInput.session_id,
   };
 }

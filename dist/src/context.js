@@ -33,6 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.truncatePrompt = truncatePrompt;
 exports.osAttribute = osAttribute;
 exports.buildActionContext = buildActionContext;
 exports.buildInvokeAgentContext = buildInvokeAgentContext;
@@ -41,12 +42,12 @@ exports.serializeToolResponse = serializeToolResponse;
 exports.buildToolResponseTransmission = buildToolResponseTransmission;
 const nodeOs = __importStar(require("node:os"));
 const ingestionClient_1 = require("./ingestionClient");
-function activeTurnEvidence(extras) {
-    const messages = extras.conversationMessages || [];
-    return {
-        hops: extras.hops || [],
-        ...(messages.length > 0 ? { conversation: { messages } } : {}),
-    };
+// Sent as the invokeAgent userQuery. An RTG 413 fails open for that request,
+// so raise this only after confirming the RTG accepts the resulting request
+// size.
+const MAX_PROMPT_LENGTH = 10000;
+function truncatePrompt(prompt) {
+    return prompt.length > MAX_PROMPT_LENGTH ? `${prompt.slice(0, MAX_PROMPT_LENGTH)}…` : prompt;
 }
 // The OS this call runs on, sent as context.os on every action. macOS is
 // reported as itself rather than folded into "Linux", which would make Mac
@@ -81,29 +82,27 @@ function activeSessionFields(extras) {
 }
 function buildActionContext(mapping, extras = {}) {
     const timestamp = Date.now();
-    const evidence = activeTurnEvidence(extras);
     const sessions = activeSessionFields(extras);
     switch (mapping.actionName) {
         case 'invokeTool':
-            return { timestamp, ...evidence, ...sessions };
+            return { timestamp, ...sessions };
         case 'spawn':
-            return { timestamp, subagentIndex: extras.subagentIndex ?? 1, ...evidence, ...sessions };
+            return { timestamp, subagentIndex: extras.subagentIndex ?? 1, ...sessions };
         case 'executeBash':
-            return { timestamp, command: mapping.command ?? '', ...evidence, ...sessions };
+            return { timestamp, command: mapping.command ?? '', ...sessions };
         case 'read':
         case 'write':
         case 'edit':
         case 'glob':
         case 'grep':
-            return { timestamp, ...evidence, ...sessions };
+            return { timestamp, ...sessions };
         default:
-            return { timestamp, ...evidence, ...sessions };
+            return { timestamp, ...sessions };
     }
 }
 function buildInvokeAgentContext(activeSessionCount = 0, currentSession, machineId, extras = {}) {
     return {
         timestamp: Date.now(),
-        hops: [],
         ...activeSessionFields({ activeSessionCount, currentSession, machineId, ...extras }),
     };
 }
@@ -123,9 +122,8 @@ function serializeToolResponse(toolResponse) {
         ? `${raw.slice(0, MAX_TOOL_RESPONSE_LENGTH)}…`
         : raw;
 }
-// userQuery is the same current-hop prompt PreToolUse sent, so a pre/post
-// pair shows one prompt,
-// and the tool's output travels separately in transmission.response.
+// userQuery is the same prompt PreToolUse sent, so a pre/post pair shows one
+// prompt, and the tool's output travels separately in transmission.response.
 function buildToolResponseTransmission(toolResponse, userQuery) {
     const transmission = buildTransmission(userQuery, 'tool');
     transmission.response = serializeToolResponse(toolResponse);

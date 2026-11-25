@@ -5,8 +5,6 @@ import { DirectEvalSession } from '../src/types';
 
 const session: DirectEvalSession = {
   id: '33333333-3333-4333-8333-333333333333',
-  turn: 3,
-  startedAt: '2026-08-14T09:57:30Z',
 };
 
 test('buildInvokeAgentRequest emits the canonical direct-AI User to Agent envelope', () => {
@@ -22,8 +20,8 @@ test('buildInvokeAgentRequest emits the canonical direct-AI User to Agent envelo
     role: 'user',
     contentType: 'text/plain',
   });
-  assert.deepEqual(request.context.hops, []);
-  assert.deepEqual(request.session, session);
+  assert.equal('hops' in request.context, false);
+  assert.deepEqual(request.session, { id: '33333333-3333-4333-8333-333333333333' });
   assert.equal('messages' in request.session, false);
   assert.equal('entities' in request, false);
   assert.equal('hops' in request, false);

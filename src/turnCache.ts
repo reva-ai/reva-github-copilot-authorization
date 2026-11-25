@@ -1,19 +1,22 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { deriveTraceId, mintTraceId } from './trace';
-import { DirectEvalConversationMessage, DirectEvalSession } from './types';
+import { DirectEvalSession } from './types';
 
-// PreToolUse hooks don't receive the user's prompt text directly — only
-// UserPromptSubmit does — and each hook invocation is a separate stateless
-// process, so there's no in-memory way to share state between them.
+// Each hook invocation is a separate stateless process, so there's no
+// in-memory way to share state between them.
 //
-// Also used to pin the TRACE id for an entire turn: rather than trusting
-// the host's own prompt_id to reliably distinguish turns in every mode,
+// Used to pin the TRACE id for an entire turn: rather than trusting the
+// host's own prompt_id to reliably distinguish turns in every mode,
 // UserPromptSubmit mints its own fresh id here and every PreToolUse call
 // in that turn reads the same value back — the plugin owns the turn
 // boundary itself instead of relying on an upstream field we don't fully
 // control. Span ids are no longer stored: they are derived per operation
 // from this trace id (see trace.ts).
+//
+// Only ids, a turn number and timestamps are written. The prompt text is
+// sent to Reva and never stored on the machine, and a `prompt` field left in
+// an entry by an earlier version is never carried into a new one.
 //
 // Best-effort throughout: if the cache can't be written or read, actions
 // just proceed without turn-scoped context rather than failing.
@@ -25,13 +28,10 @@ export interface TurnCacheEntry {
   // new one. Optional only because entries written before this field
   // existed will not have it; see resolveTurnTraceId for that fallback.
   traceId?: string;
-  prompt?: string;
   promptTimestamp: string;
   turn: number;
   startedAt: string;
 }
-
-const MAX_PROMPT_LENGTH = 2000;
 
 // No fallback: only ever writes inside the host-blessed plugin data dir.
 // Without it, there is nothing honest to write to.
@@ -44,10 +44,6 @@ function cacheFile(sessionId: string, pluginDataDir?: string): string | undefine
   if (!dir) return undefined;
   const safe = sessionId.replace(/[^a-zA-Z0-9_-]/g, '_');
   return path.join(dir, `${safe}.json`);
-}
-
-export function truncatePrompt(prompt: string): string {
-  return prompt.length > MAX_PROMPT_LENGTH ? `${prompt.slice(0, MAX_PROMPT_LENGTH)}…` : prompt;
 }
 
 // Call once per turn, from UserPromptSubmit. Mints a fresh trace id and
@@ -65,7 +61,7 @@ function saveTurn(sessionId: string, entry: TurnCacheEntry, pluginDataDir?: stri
   }
 }
 
-export function startTurn(sessionId: string, prompt: string | undefined, pluginDataDir?: string): TurnCacheEntry {
+export function startTurn(sessionId: string, pluginDataDir?: string): TurnCacheEntry {
   const previous = loadTurn(sessionId, pluginDataDir);
   const observedAt = new Date().toISOString();
   const turn = (previous?.turn || 0) + 1;
@@ -79,7 +75,6 @@ export function startTurn(sessionId: string, prompt: string | undefined, pluginD
   const traceId = cacheFile(sessionId, pluginDataDir) ? mintTraceId() : deriveTraceId(sessionId, turn);
   const entry: TurnCacheEntry = {
     traceId,
-    ...(prompt ? { prompt: truncatePrompt(prompt) } : {}),
     promptTimestamp: observedAt,
     turn,
     startedAt: previous?.startedAt || observedAt,
@@ -105,24 +100,13 @@ export function loadTurn(sessionId: string, pluginDataDir?: string): TurnCacheEn
 export function loadOrStartTurn(sessionId: string, pluginDataDir?: string): TurnCacheEntry {
   const existing = loadTurn(sessionId, pluginDataDir);
   if (existing?.turn && existing.startedAt && existing.promptTimestamp) return existing;
-  return startTurn(sessionId, existing?.prompt, pluginDataDir);
+  return startTurn(sessionId, pluginDataDir);
 }
 
-export function directSessionFromTurn(sessionId: string, turn: TurnCacheEntry): DirectEvalSession {
-  return { id: sessionId, turn: turn.turn, startedAt: turn.startedAt };
-}
-
-export function conversationFromTurn(turn: TurnCacheEntry): DirectEvalConversationMessage[] {
-  if (!turn.prompt?.trim()) return [];
-  return [
-    {
-      seq: 1,
-      role: 'user',
-      contentType: 'text/plain',
-      content: turn.prompt,
-      timestamp: turn.promptTimestamp,
-    },
-  ];
+// Reva only needs the thread id on the request; the turn number and start time
+// stay local (the turn number seeds the trace id).
+export function directSessionFromTurn(sessionId: string): DirectEvalSession {
+  return { id: sessionId };
 }
 
 // The trace id every hook in this turn must agree on. Normally read straight

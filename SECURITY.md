@@ -12,17 +12,31 @@ handles credentials, and when it blocks or lets actions through.
   `invokeTool`, `invokeAgent`) and its target: a file or folder path (relative to the
   repository when inside one, otherwise the full path), a tool name, or an MCP server.
 - **Content:**
-  - the text of your prompt;
+  - the text of your prompt, up to 10,000 characters;
   - the shell command, search pattern or patch being run;
   - after a tool runs, its output, up to 10,000 characters.
 - **Context:**
   - session id and timestamp;
-  - the chain of agents and sub-agents that led to the action;
+  - which sub-agent made the call, when one did (the chain of agents that led to an action is
+    recorded by Reva itself; the plugin sends no hop chain and no conversation history);
   - the surface (`cli`, `ide-<editor>`, `Copilot Desktop`) and the operating system;
   - the model Copilot used for that call;
   - your operating system's own machine id (on Windows the `MachineGuid`), or none if it
     cannot be read — never a made-up one;
   - how many sessions are active on this machine.
+
+### Sent once per turn, when Copilot finishes it
+
+A short best-effort request that closes the turn's trace in Reva so it can write the trace
+summary (`POST /pdp/ai/access/v1/ai/trace/summarize`, from the `agentStop` hook):
+
+- the trace id and your session id;
+- **the assistant's final reply, up to 16 KiB, only if Copilot includes it in the hook input.**
+  Copilot's `agentStop` input carries a path to its transcript rather than the reply, so
+  today the request holds the two ids alone. The plugin never opens the transcript file.
+
+It uses your Reva token and nothing else. If it fails, nothing happens: it never blocks
+Copilot, and it is skipped for the rest of a session once Reva has rejected the token (401).
 
 ### Sent once per session, to register you in Reva's directory
 
@@ -40,15 +54,19 @@ In `~/.copilot/plugin-data/reva-plugins/reva-security/`:
 | File or folder | Contents |
 |---|---|
 | `copilot-account.json` | Your Copilot login, host, account id and public email |
-| `turns/` | The current turn's prompt (first 2,000 characters) and trace ids |
-| `hops/`, `spawns/`, `subagents/` | Which agent started which, and how many sub-agents this turn |
+| `turns/` | The current turn's trace id, turn number and timestamps. Never your prompt: it is sent to Reva and not stored here |
+| `spawns/`, `subagents/` | How many sub-agents this turn, and which session each sub-agent belongs to |
 | `active-sessions/` | Session ids and when each was last seen |
 | `rtg-circuit-breaker/` | Sessions where Reva rejected the token (see below) |
 | `machine-id` | Your operating system's machine id, saved after it is first read |
 | `agent-models.json`, `entity-types/` | Small caches |
 | `reva-debug.log` | Only with `REVA_DEBUG=1`; contains prompts and commands |
 
-Nothing is written to your repositories. Delete the folder to remove all of it.
+A `hops/` folder left by an earlier version is no longer used or read; delete it. Likewise, a
+file in `turns/` written by an earlier version may still hold the first 2,000 characters of a
+prompt: nothing reads it, and the session's next turn overwrites it, or you can delete the
+folder. Nothing is
+written to your repositories. Delete the folder to remove all of it.
 
 ## Credentials
 
@@ -72,6 +90,7 @@ Reva. The lookup happens once per sign-in; the result is saved in `copilot-accou
 | Request too large (413) | **passes through** for that one request |
 | Plugin not configured (token or agent id missing) | **blocked, every action** |
 | Unexpected error inside the plugin | **blocked** |
+| The end-of-turn summarize request fails or Reva is unreachable | ignored — it never blocks |
 
 The plugin blocks before a tool runs. After-the-fact checks are recorded but cannot undo a
 tool that already ran.

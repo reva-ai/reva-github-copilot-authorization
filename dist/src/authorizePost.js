@@ -22,7 +22,7 @@ async function main() {
     const cfg = (0, config_1.loadConfig)();
     const pluginDataDir = (0, pluginData_1.resolvePluginDataDir)();
     // See authorize.ts: a Copilot subagent's calls are attributed to the
-    // user's root session, with the SubAgent subject and its bound lineage.
+    // user's root session, with the SubAgent subject.
     const caller = (0, identity_1.resolveCaller)(cfg.agentId, input, pluginDataDir);
     const sessionId = caller.sessionId;
     const activeSessionCount = (0, activeSessions_1.getActiveSessionCount)(cfg.agentId, pluginDataDir);
@@ -60,21 +60,19 @@ async function main() {
             agentType: caller.subAgentType || 'subagent',
         })
         : (0, entity_1.buildEntityDescriptor)('Agent', caller.agentId);
-    const hops = caller.hops;
-    // Same current-hop prompt PreToolUse puts in transmission.userQuery.
+    // Same prompt PreToolUse puts in transmission.userQuery.
     const firstMapping = toolMapping.mappings[0];
     const serializedInput = JSON.stringify(input.tool_input || {});
     const patchText = typeof input.tool_input?.raw === 'string' ? input.tool_input.raw.trim() : '';
-    const currentHopContent = firstMapping.command?.trim() ||
+    const currentToolContent = firstMapping.command?.trim() ||
         firstMapping.pattern?.trim() ||
         patchText ||
         (serializedInput !== '{}' ? serializedInput : input.tool_name);
     // userQuery matches PreToolUse; the tool result is transmission.response,
     // not closed Cedar context, so the evaluate payload carries it without a
     // schema change.
-    const transmission = (0, context_1.buildToolResponseTransmission)(input.tool_response, currentHopContent);
-    const conversationMessages = (0, turnCache_1.conversationFromTurn)(turn);
-    const session = (0, turnCache_1.directSessionFromTurn)(sessionId, turn);
+    const transmission = (0, context_1.buildToolResponseTransmission)(input.tool_response, currentToolContent);
+    const session = (0, turnCache_1.directSessionFromTurn)(sessionId);
     const machineId = (0, deviceId_1.resolveMachineId)(pluginDataDir);
     // The model behind this call: a Copilot subagent's own (subagent.configured
     // in the root session's record), otherwise the session's. See copilotModel.ts.
@@ -87,8 +85,6 @@ async function main() {
             action: { name: mapping.actionName },
             resource: (0, entity_1.directSpecOf)(resourceDescriptor),
             context: (0, context_1.buildActionContext)(mapping, {
-                hops,
-                conversationMessages,
                 activeSessionCount,
                 currentSession,
                 machineId,
@@ -97,7 +93,7 @@ async function main() {
             transmission,
             session,
         };
-        (0, debug_1.debugLog)(`-> post ${mapping.actionName} on ${mapping.resourceType}:${mapping.resourceId} (tool=${input.tool_name}, hops=${hops.length}${caller.isSubAgent ? `, subagent=${caller.subAgentId}` : ''})`);
+        (0, debug_1.debugLog)(`-> post ${mapping.actionName} on ${mapping.resourceType}:${mapping.resourceId} (tool=${input.tool_name}${caller.isSubAgent ? `, subagent=${caller.subAgentId}` : ''})`);
         return { mapping, request, traceparent: traceparentFor(mapping) };
     });
     const result = (0, evaluateAll_1.toHookResult)(await (0, evaluateAll_1.evaluateAll)(cfg, requests, pluginDataDir, sessionId));

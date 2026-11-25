@@ -3,11 +3,9 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { test } from 'node:test';
-import { enqueuePendingSpawnLineage, startTurnHops } from '../src/hopChain';
 import { resolveCaller } from '../src/identity';
 import { normalizeUserPrompt } from '../src/normalize';
 import { registerSubAgent, removeSubAgentsOfSession, resolveSubAgent, SubAgentEntry } from '../src/subAgentRegistry';
-import { CedarHop } from '../src/types';
 
 function withTempDir(fn: (dir: string) => void): void {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'reva-governance-subagents-'));
@@ -18,24 +16,8 @@ function withTempDir(fn: (dir: string) => void): void {
   }
 }
 
-const invokeAgentHop: CedarHop = {
-  seq: 1,
-  subject: { type: 'User', id: 'alice@example.com' },
-  action: { name: 'invokeAgent' },
-  resource: { type: 'Agent', id: 'agent-1' },
-  time: '2026-01-01T00:00:00.000Z',
-};
-
-const spawnHop: CedarHop = {
-  seq: 2,
-  subject: { type: 'Agent', id: 'agent-1' },
-  action: { name: 'spawn' },
-  resource: { type: 'SubAgent', id: 'explore' },
-  time: '2026-01-01T00:00:01.000Z',
-};
-
-function entry(subAgentId: string, parentSessionId: string, lineage: CedarHop[] = []): SubAgentEntry {
-  return { subAgentId, parentSessionId, agentType: 'explore', lineage, registeredAt: '2026-01-01T00:00:00.000Z' };
+function entry(subAgentId: string, parentSessionId: string): SubAgentEntry {
+  return { subAgentId, parentSessionId, agentType: 'explore', registeredAt: '2026-01-01T00:00:00.000Z' };
 }
 
 test('resolveSubAgent returns undefined for an unregistered (top-level) session', () => {
@@ -46,11 +28,10 @@ test('resolveSubAgent returns undefined for an unregistered (top-level) session'
 
 test('resolveSubAgent resolves a direct child to its parent as root', () => {
   withTempDir((dir) => {
-    registerSubAgent('child', entry('child', 'parent', [invokeAgentHop, spawnHop]), dir);
+    registerSubAgent('child', entry('child', 'parent'), dir);
     const resolved = resolveSubAgent('child', dir);
     assert.equal(resolved?.rootSessionId, 'parent');
     assert.equal(resolved?.agentType, 'explore');
-    assert.equal(resolved?.lineage.length, 2);
   });
 });
 
@@ -95,38 +76,45 @@ test('removeSubAgentsOfSession removes children and grandchildren of that sessio
   });
 });
 
-test('resolveCaller: top-level session uses its own id and turn hops', () => {
+test('resolveCaller: top-level session uses its own id', () => {
   withTempDir((dir) => {
-    startTurnHops('parent', invokeAgentHop, dir);
     const caller = resolveCaller('agent-1', { session_id: 'parent' }, dir);
     assert.equal(caller.isSubAgent, false);
     assert.equal(caller.sessionId, 'parent');
-    assert.equal(caller.hopSessionId, 'parent');
-    assert.deepEqual(caller.hops, [invokeAgentHop]);
+    assert.equal('hops' in caller, false);
   });
 });
 
 test('resolveCaller: registered Copilot subagent maps to the root session as SubAgent', () => {
   withTempDir((dir) => {
-    registerSubAgent('child', entry('child', 'parent', [invokeAgentHop, spawnHop]), dir);
+    registerSubAgent('child', entry('child', 'parent'), dir);
     const caller = resolveCaller('agent-1', { session_id: 'child' }, dir);
     assert.equal(caller.isSubAgent, true);
     assert.equal(caller.subAgentId, 'child');
     assert.equal(caller.subAgentType, 'explore');
     assert.equal(caller.sessionId, 'parent');
-    assert.equal(caller.hopSessionId, 'child', 'its own spawns queue under its own id');
-    assert.deepEqual(caller.hops, [invokeAgentHop, spawnHop]);
+    assert.equal('hops' in caller, false);
   });
 });
 
-test('resolveCaller: Claude-style agent_id keeps the shared session and binds a pending lineage', () => {
+test('resolveCaller: Claude-style agent_id keeps the shared session', () => {
   withTempDir((dir) => {
-    startTurnHops('session-1', invokeAgentHop, dir);
-    enqueuePendingSpawnLineage('session-1', [invokeAgentHop], spawnHop, dir);
     const caller = resolveCaller('agent-1', { session_id: 'session-1', agent_id: 'sub-1', agent_type: 'Explore' }, dir);
     assert.equal(caller.isSubAgent, true);
+    assert.equal(caller.subAgentId, 'sub-1');
     assert.equal(caller.sessionId, 'session-1');
-    assert.deepEqual(caller.hops, [invokeAgentHop, spawnHop]);
+  });
+});
+
+test('an entry written before hops were removed still resolves (extra lineage field ignored)', () => {
+  withTempDir((dir) => {
+    fs.mkdirSync(path.join(dir, 'subagents'), { recursive: true });
+    fs.writeFileSync(
+      path.join(dir, 'subagents', 'child.json'),
+      JSON.stringify({ ...entry('child', 'parent'), lineage: [{ seq: 1 }] }),
+      'utf8',
+    );
+    assert.equal(resolveSubAgent('child', dir)?.rootSessionId, 'parent');
   });
 });
 

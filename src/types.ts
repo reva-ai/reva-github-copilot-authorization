@@ -1,5 +1,8 @@
 export interface RevaConfig {
   rtgUrl: string;
+  // GET the minimum supported / current version window for coding-agent
+  // plugin protocol versioning.
+  pluginVersionUrl: string;
   // Sent as the X-API-Token header on BOTH evaluation and ingestion calls —
   // one Reva auth token authenticates everything this plugin does.
   authorization: string;
@@ -8,6 +11,9 @@ export interface RevaConfig {
   // neither a GitHub account id nor REVA_AGENT_ID is available.
   agentId: string;
   timeoutMs: number;
+  // POST closes one prompt's trace when the agent finishes its turn, so Reva
+  // can write the trace summary (src/stop.ts).
+  summarizeUrl: string;
   ingestionUrl: string;
   ingestionTimeoutMs: number;
 }
@@ -66,22 +72,6 @@ export interface CedarEntityDescriptor {
   parents: CedarEntityRef[];
 }
 
-export interface CedarHop {
-  seq: number;
-  subject: CedarEntityRef;
-  action: { name: string };
-  resource: CedarEntityRef;
-  time: string;
-}
-
-export interface DirectEvalConversationMessage {
-  seq: number;
-  role: 'user' | 'assistant' | 'tool';
-  contentType: string;
-  content: string;
-  timestamp: string;
-}
-
 export interface DirectEvalTransmission {
   promptKey: 'userQuery';
   userQuery: string;
@@ -92,10 +82,12 @@ export interface DirectEvalTransmission {
   response?: string;
 }
 
+// Thread id only. Reva records the hops of a trace and the earlier prompts of
+// a thread itself, so a request carries no hops, conversation, turn number or
+// start time: if the caller supplies them Reva keeps them and does not attach
+// what it recorded.
 export interface DirectEvalSession {
   id: string;
-  turn: number;
-  startedAt: string;
 }
 
 export interface CedarRequest {
@@ -154,6 +146,21 @@ export interface ToolMapping {
   // denied rather than evaluated partially or widened to a common ancestor.
   overCap?: boolean;
   candidateCount?: number;
+}
+
+// Normalized end-of-turn input: Copilot CLI's agentStop (camelCase) or VS Code
+// Copilot Chat's Stop (snake_case).
+export interface StopInput {
+  session_id: string;
+  cwd: string;
+  hook_event_name: string;
+  transcript_path?: string;
+  stop_hook_active?: boolean;
+  // The assistant's final reply, when the host sends it. Copilot's documented
+  // agentStop / Stop payload carries only a transcript path, so this is
+  // normally absent (subagentStop is where Copilot documents `response` /
+  // `last_assistant_message`).
+  last_assistant_message?: string;
 }
 
 export interface SessionContext {

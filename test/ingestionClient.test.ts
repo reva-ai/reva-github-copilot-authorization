@@ -12,6 +12,8 @@ import { RevaConfig } from '../src/types';
 
 const baseCfg: RevaConfig = {
   rtgUrl: 'https://pdp.test/evaluate',
+  pluginVersionUrl: 'https://pdp.test/pdp/ai/access/v1/ai/plugin/version',
+  summarizeUrl: 'https://pdp.test/pdp/ai/access/v1/ai/trace/summarize',
   authorization: 'eval-token',
   agentId: 'aa-bb-cc-dd-ee-ff',
   timeoutMs: 1000,

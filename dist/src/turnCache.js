@@ -33,17 +33,14 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.truncatePrompt = truncatePrompt;
 exports.startTurn = startTurn;
 exports.loadTurn = loadTurn;
 exports.loadOrStartTurn = loadOrStartTurn;
 exports.directSessionFromTurn = directSessionFromTurn;
-exports.conversationFromTurn = conversationFromTurn;
 exports.resolveTurnTraceId = resolveTurnTraceId;
 const fs = __importStar(require("node:fs"));
 const path = __importStar(require("node:path"));
 const trace_1 = require("./trace");
-const MAX_PROMPT_LENGTH = 2000;
 // No fallback: only ever writes inside the host-blessed plugin data dir.
 // Without it, there is nothing honest to write to.
 function cacheDir(pluginDataDir) {
@@ -55,9 +52,6 @@ function cacheFile(sessionId, pluginDataDir) {
         return undefined;
     const safe = sessionId.replace(/[^a-zA-Z0-9_-]/g, '_');
     return path.join(dir, `${safe}.json`);
-}
-function truncatePrompt(prompt) {
-    return prompt.length > MAX_PROMPT_LENGTH ? `${prompt.slice(0, MAX_PROMPT_LENGTH)}…` : prompt;
 }
 // Call once per turn, from UserPromptSubmit. Mints a fresh trace id and
 // persists it (overwriting any previous turn's entry for this session) so
@@ -75,7 +69,7 @@ function saveTurn(sessionId, entry, pluginDataDir) {
         // best effort — later hooks can reconstruct metadata from what they see
     }
 }
-function startTurn(sessionId, prompt, pluginDataDir) {
+function startTurn(sessionId, pluginDataDir) {
     const previous = loadTurn(sessionId, pluginDataDir);
     const observedAt = new Date().toISOString();
     const turn = (previous?.turn || 0) + 1;
@@ -89,7 +83,6 @@ function startTurn(sessionId, prompt, pluginDataDir) {
     const traceId = cacheFile(sessionId, pluginDataDir) ? (0, trace_1.mintTraceId)() : (0, trace_1.deriveTraceId)(sessionId, turn);
     const entry = {
         traceId,
-        ...(prompt ? { prompt: truncatePrompt(prompt) } : {}),
         promptTimestamp: observedAt,
         turn,
         startedAt: previous?.startedAt || observedAt,
@@ -116,23 +109,12 @@ function loadOrStartTurn(sessionId, pluginDataDir) {
     const existing = loadTurn(sessionId, pluginDataDir);
     if (existing?.turn && existing.startedAt && existing.promptTimestamp)
         return existing;
-    return startTurn(sessionId, existing?.prompt, pluginDataDir);
+    return startTurn(sessionId, pluginDataDir);
 }
-function directSessionFromTurn(sessionId, turn) {
-    return { id: sessionId, turn: turn.turn, startedAt: turn.startedAt };
-}
-function conversationFromTurn(turn) {
-    if (!turn.prompt?.trim())
-        return [];
-    return [
-        {
-            seq: 1,
-            role: 'user',
-            contentType: 'text/plain',
-            content: turn.prompt,
-            timestamp: turn.promptTimestamp,
-        },
-    ];
+// Reva only needs the thread id on the request; the turn number and start time
+// stay local (the turn number seeds the trace id).
+function directSessionFromTurn(sessionId) {
+    return { id: sessionId };
 }
 // The trace id every hook in this turn must agree on. Normally read straight
 // from the cache entry UserPromptSubmit wrote. The fallback covers an entry
