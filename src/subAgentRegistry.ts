@@ -1,6 +1,5 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { CedarHop } from './types';
 
 // Copilot CLI gives every spawned subagent its OWN sessionId (= the
 // subagent's agentId) rather than keeping the parent's session_id on its tool
@@ -10,15 +9,14 @@ import { CedarHop } from './types';
 //
 // Without this registry each subagent would therefore look like a brand-new
 // top-level session: its kickoff would be evaluated as a human invokeAgent,
-// its tool calls would run as the top-level Agent with hops=0, and Reva would
-// see one extra session per subagent instead of one session with N subagents
-// in it.
+// its tool calls would run as the top-level Agent, and Reva would see one
+// extra session per subagent instead of one session with N subagents in it.
 //
 // So: on the subagent's userPromptSubmitted we record
-// child sessionId → { parent sessionId, agentType, lineage } here, and every
-// later hook looks its own sessionId up to recover the root session, the
-// SubAgent identity and the delegation chain. Nested subagents chain
-// naturally — a grandchild's parent is a registered child.
+// child sessionId → { parent sessionId, agentType } here, and every later
+// hook looks its own sessionId up to recover the root session and the
+// SubAgent identity. Nested subagents chain naturally — a grandchild's parent
+// is a registered child.
 //
 // Best-effort, like the other caches: a missing or corrupt entry just means
 // the call is treated as top-level, never a throw.
@@ -29,9 +27,6 @@ export interface SubAgentEntry {
   subAgentId: string;
   parentSessionId: string;
   agentType: string;
-  // The chain BEFORE this subagent's own actions: the parent's lineage plus
-  // the spawn hop that created it. Bound once, at registration.
-  lineage: CedarHop[];
   registeredAt: string;
 }
 

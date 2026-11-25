@@ -3,7 +3,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { test } from 'node:test';
-import { evaluate } from '../src/rtgClient';
+import { evaluate, summarizeTrace } from '../src/rtgClient';
 import { CedarRequest, RevaConfig } from '../src/types';
 
 async function withTempDir(fn: (dir: string) => Promise<void>): Promise<void> {
@@ -16,7 +16,9 @@ async function withTempDir(fn: (dir: string) => Promise<void>): Promise<void> {
 }
 
 const baseCfg: RevaConfig = {
-  rtgUrl: 'https://pdp.test/pdp/v2/ai/evaluation',
+  rtgUrl: 'https://pdp.test/pdp/ai/access/v1/ai/evaluation',
+  pluginVersionUrl: 'https://pdp.test/pdp/ai/access/v1/ai/plugin/version',
+  summarizeUrl: 'https://pdp.test/pdp/ai/access/v1/ai/trace/summarize',
   authorization: 'test-token',
   agentId: 'agent-a',
   timeoutMs: 1000,
@@ -32,15 +34,6 @@ const baseRequest: CedarRequest = {
   context: {
     timestamp: 1,
     prompt: 'find docs',
-    hops: [
-      {
-        seq: 1,
-        subject: { type: 'User', id: 'alice@example.com' },
-        action: { name: 'invokeAgent' },
-        resource: { type: 'Agent', id: 'agent-a' },
-        time: '2026-08-19T10:00:00Z',
-      },
-    ],
   },
   transmission: {
     promptKey: 'userQuery',
@@ -48,7 +41,7 @@ const baseRequest: CedarRequest = {
     role: 'assistant',
     contentType: 'text/plain',
   },
-  session: { id: 'sess-1', turn: 1, startedAt: '2026-08-19T10:00:00Z' },
+  session: { id: 'sess-1' },
 };
 
 async function withFetch<T>(impl: typeof fetch, fn: () => Promise<T>): Promise<T> {
@@ -357,8 +350,8 @@ test('request uses canonical body and raw X-API-Token header', async () => {
   assert.equal(headers?.['X-Reva-Thread-Id'], 'sess-thread-1');
   assert.equal(headers?.Authorization, undefined);
   assert.equal(body.transmission.promptKey, 'userQuery');
-  assert.deepEqual(body.context.hops[0].action, { name: 'invokeAgent' });
-  assert.deepEqual(body.session, baseRequest.session);
+  assert.equal('hops' in body.context, false);
+  assert.deepEqual(body.session, { id: 'sess-1' });
   assert.equal('messages' in body.session, false);
   assert.equal('entities' in body, false);
   assert.equal('hops' in body, false);
@@ -511,4 +504,84 @@ test('with a pluginDataDir, a network failure and a timeout never open the circu
       },
     );
   });
+});
+
+// ---- summarizeTrace ----------------------------------------------------------
+
+test('summarizeTrace posts trace_id, thread_id and output to the summarize URL', async () => {
+  let url: string | undefined;
+  let method: string | undefined;
+  let headers: Record<string, string> | undefined;
+  let body: any;
+  const result = await withFetch(
+    (async (u: any, opts: any) => {
+      url = u;
+      method = opts.method;
+      headers = opts.headers;
+      body = JSON.parse(opts.body);
+      return new Response('{}', { status: 202 });
+    }) as any,
+    () => summarizeTrace(baseCfg, { trace_id: 'a'.repeat(32), thread_id: 'sess-1', output: 'done' }),
+  );
+  assert.deepEqual(result, { ok: true, status: 202 });
+  assert.equal(url, 'https://pdp.test/pdp/ai/access/v1/ai/trace/summarize');
+  assert.equal(method, 'POST');
+  assert.deepEqual(body, { trace_id: 'a'.repeat(32), thread_id: 'sess-1', output: 'done' });
+  assert.equal(headers?.['X-API-Token'], 'test-token');
+  assert.equal(headers?.['X-API-Origin-App'], 'GITHUB_COPILOT');
+  assert.equal(headers?.['X-Reva-Thread-Id'], 'sess-1');
+  assert.equal(headers?.['Content-Type'], 'application/json');
+  // CODE_USER_SCOPE needs principal.id in the body, which summarize does not send.
+  assert.equal(headers?.['X-Reva-Verification-Codes'], undefined);
+});
+
+test('summarizeTrace omits output and the thread header when not given', async () => {
+  let headers: Record<string, string> | undefined;
+  let body: any;
+  await withFetch(
+    (async (_u: any, opts: any) => {
+      headers = opts.headers;
+      body = JSON.parse(opts.body);
+      return new Response('{}', { status: 202 });
+    }) as any,
+    () => summarizeTrace(baseCfg, { trace_id: 'b'.repeat(32) }),
+  );
+  assert.deepEqual(body, { trace_id: 'b'.repeat(32) });
+  assert.equal(headers?.['X-Reva-Thread-Id'], undefined);
+});
+
+test('summarizeTrace reports a non-202 as not ok, without throwing', async () => {
+  for (const status of [400, 401, 403, 404, 500]) {
+    const result = await withFetch(
+      (async () => new Response('nope', { status })) as any,
+      () => summarizeTrace(baseCfg, { trace_id: 'c'.repeat(32) }),
+    );
+    assert.equal(result.ok, false);
+    assert.equal(result.status, status);
+    assert.equal(result.reason, 'nope');
+  }
+});
+
+test('summarizeTrace swallows a transport failure', async () => {
+  const result = await withFetch(
+    (async () => {
+      throw new Error('connect ECONNREFUSED');
+    }) as any,
+    () => summarizeTrace(baseCfg, { trace_id: 'd'.repeat(32) }),
+  );
+  assert.equal(result.ok, false);
+  assert.match(result.reason || '', /ECONNREFUSED/);
+});
+
+test('summarizeTrace gives up after a short timeout', async () => {
+  const started = Date.now();
+  const result = await withFetch(
+    ((_u: any, opts: any) =>
+      new Promise((_resolve, reject) => {
+        opts.signal.addEventListener('abort', () => reject(new Error('aborted')));
+      })) as any,
+    () => summarizeTrace({ ...baseCfg, timeoutMs: 50 }, { trace_id: 'e'.repeat(32) }),
+  );
+  assert.equal(result.ok, false);
+  assert.ok(Date.now() - started < 2000);
 });

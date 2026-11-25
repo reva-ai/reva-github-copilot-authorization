@@ -45,6 +45,15 @@
         "cwd": "${PLUGIN_ROOT}",
         "timeoutSec": 45
       }
+    ],
+    "agentStop": [
+      {
+        "type": "command",
+        "bash": "node dist/src/stop.js",
+        "powershell": "node dist/src/stop.js",
+        "cwd": "${PLUGIN_ROOT}",
+        "timeoutSec": 10
+      }
     ]
   }
 }

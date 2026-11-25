@@ -85,7 +85,7 @@ function traceIdOf(traceparent?: string): string | undefined {
   return traceparent?.split('-')[1];
 }
 
-test('Copilot subagents land in the parent session as SubAgent subjects with their spawn lineage', async () => {
+test('Copilot subagents land in the parent session as SubAgent subjects, with no hop history sent', async () => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'reva-subagent-flow-'));
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'reva-subagent-home-'));
   try {
@@ -150,6 +150,19 @@ test('Copilot subagents land in the parent session as SubAgent subjects with the
       // Every request is in the parent session…
       for (const b of bodies) assert.equal(b.session.id, PARENT);
 
+      // …and none sends hops, conversation or session history: Reva records
+      // the hop chain itself, and anything sent here would stop it attaching
+      // what it recorded.
+      for (const b of bodies) {
+        assert.deepEqual(b.session, { id: PARENT });
+        for (const key of ['hops', 'conversation', 'messages']) {
+          assert.equal(key in b.context, false, `${b.action.name}: context.${key}`);
+        }
+      }
+
+      // Nothing hop-shaped is persisted on disk either.
+      assert.equal(fs.existsSync(path.join(dataDir, 'hops')), false);
+
       // …the parent's own work (prompt, spawns, read_agent/list_agents) on
       // the turn's trace, and each subagent on a trace of its own.
       const traceOfSubject = (subjectId: string) => {
@@ -187,27 +200,21 @@ test('Copilot subagents land in the parent session as SubAgent subjects with the
       assert.equal(spawns[4].subject.type, 'SubAgent', 'a child spawning is itself a SubAgent');
       assert.equal(spawns[4].subject.id, `dev:${CHILDREN[0]}`);
 
-      // Child 2's calls: SubAgent subject, User → Agent → spawn lineage.
+      // Child 2's calls: SubAgent subject, under the parent's session.
       const childCalls = bodies.filter((b) => b.subject.id === `dev:${CHILDREN[1]}`);
       assert.equal(childCalls.length, 2, 'pre + post');
       for (const b of childCalls) {
         assert.equal(b.subject.type, 'SubAgent');
         assert.equal(b.subject.properties?.agentType, 'explore');
         assert.equal(b.action.name, 'executeBash');
-        assert.deepEqual(b.context.hops.map((h: any) => h.action.name), ['invokeAgent', 'spawn']);
       }
 
-      // FIFO binding: kickoffs claim spawn lineages in spawn order, so each
-      // child's spawn hop is strictly later than the previous child's.
-      const spawnTimes = CHILDREN.map((id) => Date.parse(resolveSubAgent(id, dataDir)!.lineage[1].time));
-      for (let i = 1; i < spawnTimes.length; i++) assert.ok(spawnTimes[i] > spawnTimes[i - 1], `child ${i} bound out of order`);
-
-      // Grandchild: three hops deep, last spawn made by the child SubAgent.
+      // Grandchild: still a SubAgent subject in the same session.
       const grand = bodies.find((b) => b.subject.id === `dev:${GRANDCHILD}`);
       assert.ok(grand, 'grandchild call evaluated');
+      assert.equal(grand.subject.type, 'SubAgent');
       assert.equal(grand.action.name, 'read');
-      assert.deepEqual(grand.context.hops.map((h: any) => h.action.name), ['invokeAgent', 'spawn', 'spawn']);
-      assert.equal(grand.context.hops[2].subject.id, `dev:${CHILDREN[0]}`);
+      assert.equal(resolveSubAgent(GRANDCHILD, dataDir)?.rootSessionId, PARENT);
 
       // 7. sessionEnd for the parent clears every registration under it.
       assert.ok(resolveSubAgent(GRANDCHILD, dataDir));

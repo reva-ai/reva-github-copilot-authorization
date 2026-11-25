@@ -18,7 +18,7 @@ const emptySettings = () => tempSettings('{}');
 
 describe('loadConfig', () => {
   it('builds urls from host', () => {
-    assert.equal(urlFromHost('api.reva.ai', '/pdp/v2/ai/evaluation'), 'https://api.reva.ai/pdp/v2/ai/evaluation');
+    assert.equal(urlFromHost('api.reva.ai', '/pdp/ai/access/v1/ai/evaluation'), 'https://api.reva.ai/pdp/ai/access/v1/ai/evaluation');
     assert.equal(urlFromHost('localhost:8787', '/ingestion/v2'), 'http://localhost:8787/ingestion/v2');
   });
 
@@ -73,7 +73,9 @@ describe('loadConfig', () => {
     assert.equal(cfg.agentId, 'agent-s');
     // Copilot does not inject settings.env into hooks, so the host is read
     // from settings.json itself.
-    assert.equal(cfg.rtgUrl, 'http://localhost:9999/pdp/v2/ai/evaluation');
+    assert.equal(cfg.rtgUrl, 'http://localhost:9999/pdp/ai/access/v1/ai/evaluation');
+    assert.equal(cfg.pluginVersionUrl, 'http://localhost:9999/pdp/ai/access/v1/ai/plugin/version');
+    assert.equal(cfg.summarizeUrl, 'http://localhost:9999/pdp/ai/access/v1/ai/trace/summarize');
   });
 
   it('prefers settings.json over env for token/agentId; process REVA_HOST still wins', () => {
@@ -90,7 +92,7 @@ describe('loadConfig', () => {
     );
     assert.equal(cfg.authorization, 'settings-tok');
     assert.equal(cfg.agentId, 'agent-s');
-    assert.equal(cfg.rtgUrl, 'http://localhost:8787/pdp/v2/ai/evaluation');
+    assert.equal(cfg.rtgUrl, 'http://localhost:8787/pdp/ai/access/v1/ai/evaluation');
   });
 
   it('uses settings REVA_HOST when process env is unset', () => {
@@ -100,13 +102,15 @@ describe('loadConfig', () => {
       }),
     );
     const cfg = loadConfig({}, file);
-    assert.equal(cfg.rtgUrl, 'https://api.example.reva.ai/pdp/v2/ai/evaluation');
+    assert.equal(cfg.rtgUrl, 'https://api.example.reva.ai/pdp/ai/access/v1/ai/evaluation');
   });
 
   it('host defaults to api.reva.ai when neither env nor settings set REVA_HOST', () => {
     const { file } = tempSettings(JSON.stringify({ REVA_AUTH_TOKEN: 'tok', REVA_AGENT_ID: 'a' }));
     const cfg = loadConfig({}, file);
-    assert.equal(cfg.rtgUrl, 'https://api.reva.ai/pdp/v2/ai/evaluation');
+    assert.equal(cfg.rtgUrl, 'https://api.reva.ai/pdp/ai/access/v1/ai/evaluation');
+    assert.equal(cfg.pluginVersionUrl, 'https://api.reva.ai/pdp/ai/access/v1/ai/plugin/version');
+    assert.equal(cfg.summarizeUrl, 'https://api.reva.ai/pdp/ai/access/v1/ai/trace/summarize');
   });
 
   it('falls back to env when settings has no token', () => {

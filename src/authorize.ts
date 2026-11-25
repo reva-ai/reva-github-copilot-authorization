@@ -4,10 +4,9 @@ import { loadConfig } from './config';
 import { debugLog } from './debug';
 import { resolveCopilotModel } from './copilotModel';
 import { resolveMachineId } from './deviceId';
-import { buildEntityDescriptor, directSpecOf, refOf } from './entity';
+import { buildEntityDescriptor, directSpecOf } from './entity';
 import { evaluateAll, toHookResult } from './evaluateAll';
 import { applyIndirectExecutionFloor, detectIndirectExecution } from './indirectExecution';
-import { enqueuePendingSpawnLineage } from './hopChain';
 import { writePreToolUseDecision } from './hookOutput';
 import { resolveCaller, resolveSessionEntrypointForSession, resolveUserEmail } from './identity';
 import { mapToolCall } from './mapping';
@@ -17,8 +16,8 @@ import { resolvePluginDataDir } from './pluginData';
 import { readStdin } from './stdin';
 import { nextSpawnIndex } from './spawnCounter';
 import { buildTraceId, deriveSpanId, toolSpanKey, traceparentHeader } from './trace';
-import { CedarEntityDescriptor, CedarHop, CedarRequest, RtgResult } from './types';
-import { conversationFromTurn, directSessionFromTurn, loadOrStartTurn, resolveTurnTraceId } from './turnCache';
+import { CedarEntityDescriptor, CedarRequest, RtgResult } from './types';
+import { directSessionFromTurn, loadOrStartTurn, resolveTurnTraceId } from './turnCache';
 
 async function main(): Promise<void> {
   const raw = await readStdin();
@@ -110,23 +109,19 @@ async function main(): Promise<void> {
         agentType: caller.subAgentType || 'subagent',
       })
     : buildEntityDescriptor('Agent', caller.agentId);
-  const subject = refOf(subjectDescriptor);
 
-  const hops: CedarHop[] = caller.hops;
-
-  // The transmission describes this tool hop as the agent produced it: the
+  // The transmission describes this tool call as the agent produced it: the
   // command, the search pattern, the raw patch text, or the serialized input.
   const firstMapping = toolMapping.mappings[0];
   const serializedInput = JSON.stringify(input.tool_input || {});
   const patchText = typeof input.tool_input?.raw === 'string' ? input.tool_input.raw.trim() : '';
-  const currentHopContent =
+  const currentToolContent =
     firstMapping.command?.trim() ||
     firstMapping.pattern?.trim() ||
     patchText ||
     (serializedInput !== '{}' ? serializedInput : input.tool_name);
-  const transmission = buildTransmission(currentHopContent, 'assistant', input.tool_name);
-  const conversationMessages = conversationFromTurn(turn);
-  const session = directSessionFromTurn(sessionId, turn);
+  const transmission = buildTransmission(currentToolContent, 'assistant', input.tool_name);
+  const session = directSessionFromTurn(sessionId);
   const machineId = resolveMachineId(pluginDataDir);
   // The model behind this call: a Copilot subagent's own (subagent.configured
   // in the root session's record), otherwise the session's. See copilotModel.ts.
@@ -148,8 +143,6 @@ async function main(): Promise<void> {
       resource: directSpecOf(resourceDescriptor),
       context: buildActionContext(mapping, {
         subagentIndex,
-        hops,
-        conversationMessages,
         activeSessionCount,
         currentSession,
         machineId,
@@ -161,21 +154,10 @@ async function main(): Promise<void> {
     debugLog(
       `-> ${mapping.actionName} on ${mapping.resourceType}:${mapping.resourceId} (tool=${input.tool_name}${
         subagentIndex !== undefined ? `, subagentIndex=${subagentIndex}` : ''
-      }, hops=${hops.length}${caller.isSubAgent ? `, subagent=${caller.subAgentId}` : ''}${model ? `, model=${model}` : ''})`,
+      }${caller.isSubAgent ? `, subagent=${caller.subAgentId}` : ''}${model ? `, model=${model}` : ''})`,
     );
     return { mapping, request, traceparent: traceparentFor(mapping) };
   });
-
-  if (spawnMapping) {
-    const spawnHop: CedarHop = {
-      seq: hops.length + 1,
-      subject,
-      action: { name: 'spawn' },
-      resource: { type: spawnMapping.resourceType, id: spawnMapping.resourceId },
-      time: new Date().toISOString(),
-    };
-    enqueuePendingSpawnLineage(caller.hopSessionId, hops, spawnHop, pluginDataDir);
-  }
 
   // Commands that act through code (Add-Type, .NET file APIs, eval, …) are
   // asked about even when policy allows them — see indirectExecution.ts.

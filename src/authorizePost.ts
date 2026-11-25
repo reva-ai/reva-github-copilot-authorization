@@ -14,7 +14,7 @@ import { resolvePluginDataDir } from './pluginData';
 import { readStdin } from './stdin';
 import { buildTraceId, deriveSpanId, toolSpanKey, traceparentHeader } from './trace';
 import { CedarEntityDescriptor, CedarRequest, RtgResult } from './types';
-import { conversationFromTurn, directSessionFromTurn, loadOrStartTurn, resolveTurnTraceId } from './turnCache';
+import { directSessionFromTurn, loadOrStartTurn, resolveTurnTraceId } from './turnCache';
 
 async function main(): Promise<void> {
   const raw = await readStdin();
@@ -23,7 +23,7 @@ async function main(): Promise<void> {
   const pluginDataDir = resolvePluginDataDir();
 
   // See authorize.ts: a Copilot subagent's calls are attributed to the
-  // user's root session, with the SubAgent subject and its bound lineage.
+  // user's root session, with the SubAgent subject.
   const caller = resolveCaller(cfg.agentId, input, pluginDataDir);
   const sessionId = caller.sessionId;
 
@@ -69,13 +69,11 @@ async function main(): Promise<void> {
       })
     : buildEntityDescriptor('Agent', caller.agentId);
 
-  const hops = caller.hops;
-
-  // Same current-hop prompt PreToolUse puts in transmission.userQuery.
+  // Same prompt PreToolUse puts in transmission.userQuery.
   const firstMapping = toolMapping.mappings[0];
   const serializedInput = JSON.stringify(input.tool_input || {});
   const patchText = typeof input.tool_input?.raw === 'string' ? input.tool_input.raw.trim() : '';
-  const currentHopContent =
+  const currentToolContent =
     firstMapping.command?.trim() ||
     firstMapping.pattern?.trim() ||
     patchText ||
@@ -83,9 +81,8 @@ async function main(): Promise<void> {
   // userQuery matches PreToolUse; the tool result is transmission.response,
   // not closed Cedar context, so the evaluate payload carries it without a
   // schema change.
-  const transmission = buildToolResponseTransmission(input.tool_response, currentHopContent);
-  const conversationMessages = conversationFromTurn(turn);
-  const session = directSessionFromTurn(sessionId, turn);
+  const transmission = buildToolResponseTransmission(input.tool_response, currentToolContent);
+  const session = directSessionFromTurn(sessionId);
   const machineId = resolveMachineId(pluginDataDir);
   // The model behind this call: a Copilot subagent's own (subagent.configured
   // in the root session's record), otherwise the session's. See copilotModel.ts.
@@ -104,8 +101,6 @@ async function main(): Promise<void> {
       action: { name: mapping.actionName },
       resource: directSpecOf(resourceDescriptor),
       context: buildActionContext(mapping, {
-        hops,
-        conversationMessages,
         activeSessionCount,
         currentSession,
         machineId,
@@ -115,7 +110,7 @@ async function main(): Promise<void> {
       session,
     };
     debugLog(
-      `-> post ${mapping.actionName} on ${mapping.resourceType}:${mapping.resourceId} (tool=${input.tool_name}, hops=${hops.length}${
+      `-> post ${mapping.actionName} on ${mapping.resourceType}:${mapping.resourceId} (tool=${input.tool_name}${
         caller.isSubAgent ? `, subagent=${caller.subAgentId}` : ''
       })`,
     );

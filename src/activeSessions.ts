@@ -23,7 +23,7 @@ import * as path from 'node:path';
 // it can only ever answer "how many sessions on THIS machine," not a true
 // cross-machine concurrent-session count.
 //
-// Best-effort throughout, same as turnCache/hopChain/spawnCounter: if the
+// Best-effort throughout, same as turnCache/spawnCounter: if the
 // cache can't be read or written, callers just get an empty/best-guess
 // result rather than failing the request.
 

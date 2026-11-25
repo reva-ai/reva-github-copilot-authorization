@@ -9,7 +9,6 @@ const deviceId_1 = require("./deviceId");
 const entity_1 = require("./entity");
 const evaluateAll_1 = require("./evaluateAll");
 const indirectExecution_1 = require("./indirectExecution");
-const hopChain_1 = require("./hopChain");
 const hookOutput_1 = require("./hookOutput");
 const identity_1 = require("./identity");
 const mapping_1 = require("./mapping");
@@ -96,20 +95,17 @@ async function main() {
             agentType: caller.subAgentType || 'subagent',
         })
         : (0, entity_1.buildEntityDescriptor)('Agent', caller.agentId);
-    const subject = (0, entity_1.refOf)(subjectDescriptor);
-    const hops = caller.hops;
-    // The transmission describes this tool hop as the agent produced it: the
+    // The transmission describes this tool call as the agent produced it: the
     // command, the search pattern, the raw patch text, or the serialized input.
     const firstMapping = toolMapping.mappings[0];
     const serializedInput = JSON.stringify(input.tool_input || {});
     const patchText = typeof input.tool_input?.raw === 'string' ? input.tool_input.raw.trim() : '';
-    const currentHopContent = firstMapping.command?.trim() ||
+    const currentToolContent = firstMapping.command?.trim() ||
         firstMapping.pattern?.trim() ||
         patchText ||
         (serializedInput !== '{}' ? serializedInput : input.tool_name);
-    const transmission = (0, context_1.buildTransmission)(currentHopContent, 'assistant', input.tool_name);
-    const conversationMessages = (0, turnCache_1.conversationFromTurn)(turn);
-    const session = (0, turnCache_1.directSessionFromTurn)(sessionId, turn);
+    const transmission = (0, context_1.buildTransmission)(currentToolContent, 'assistant', input.tool_name);
+    const session = (0, turnCache_1.directSessionFromTurn)(sessionId);
     const machineId = (0, deviceId_1.resolveMachineId)(pluginDataDir);
     // The model behind this call: a Copilot subagent's own (subagent.configured
     // in the root session's record), otherwise the session's. See copilotModel.ts.
@@ -125,8 +121,6 @@ async function main() {
             resource: (0, entity_1.directSpecOf)(resourceDescriptor),
             context: (0, context_1.buildActionContext)(mapping, {
                 subagentIndex,
-                hops,
-                conversationMessages,
                 activeSessionCount,
                 currentSession,
                 machineId,
@@ -135,19 +129,9 @@ async function main() {
             transmission,
             session,
         };
-        (0, debug_1.debugLog)(`-> ${mapping.actionName} on ${mapping.resourceType}:${mapping.resourceId} (tool=${input.tool_name}${subagentIndex !== undefined ? `, subagentIndex=${subagentIndex}` : ''}, hops=${hops.length}${caller.isSubAgent ? `, subagent=${caller.subAgentId}` : ''}${model ? `, model=${model}` : ''})`);
+        (0, debug_1.debugLog)(`-> ${mapping.actionName} on ${mapping.resourceType}:${mapping.resourceId} (tool=${input.tool_name}${subagentIndex !== undefined ? `, subagentIndex=${subagentIndex}` : ''}${caller.isSubAgent ? `, subagent=${caller.subAgentId}` : ''}${model ? `, model=${model}` : ''})`);
         return { mapping, request, traceparent: traceparentFor(mapping) };
     });
-    if (spawnMapping) {
-        const spawnHop = {
-            seq: hops.length + 1,
-            subject,
-            action: { name: 'spawn' },
-            resource: { type: spawnMapping.resourceType, id: spawnMapping.resourceId },
-            time: new Date().toISOString(),
-        };
-        (0, hopChain_1.enqueuePendingSpawnLineage)(caller.hopSessionId, hops, spawnHop, pluginDataDir);
-    }
     // Commands that act through code (Add-Type, .NET file APIs, eval, …) are
     // asked about even when policy allows them — see indirectExecution.ts.
     const indirect = (0, indirectExecution_1.detectIndirectExecution)(input.tool_name, firstMapping.command);

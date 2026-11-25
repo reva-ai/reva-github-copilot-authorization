@@ -107,7 +107,7 @@ Either way, start a fresh session afterwards.
 copilot plugin uninstall reva-security@reva-plugins
 ```
 
-Local state (turn caches, spawn counters, the active-session list, your saved account id)
+Local state (turn ids, spawn counters, the active-session list, your saved account id)
 lives in `~/.copilot/plugin-data/reva-plugins/reva-security/`. Delete that folder to remove
 it, along with `~/.copilot-governance/` if it exists — the debug log is written there when
 the host gives the plugin no data directory. Nothing was written to your repositories.

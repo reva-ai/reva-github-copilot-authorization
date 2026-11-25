@@ -6,7 +6,9 @@ import { RevaConfig } from './types';
 const DEFAULT_TIMEOUT_MS = 25000;
 // The path segment itself is Reva's actual API route — part of the public
 // API contract, fixed by the backend, so it must not change.
-const RTG_PATH = '/pdp/v2/ai/evaluation';
+const RTG_PATH = '/pdp/ai/access/v1/ai/evaluation';
+const PLUGIN_VERSION_PATH = '/pdp/ai/access/v1/ai/plugin/version';
+const SUMMARIZE_PATH = '/pdp/ai/access/v1/ai/trace/summarize';
 const INGESTION_PATH = '/ingestion/v2';
 
 export const DEFAULT_HOST = 'api.reva.ai';
@@ -65,6 +67,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, settingsPath?: 
   const authorization = fromSettings.authToken || env.REVA_AUTH_TOKEN?.trim() || '';
   const host = env.REVA_HOST?.trim() || fromSettings.host || DEFAULT_HOST;
   const rtgUrl = urlFromHost(host, RTG_PATH);
+  const pluginVersionUrl = urlFromHost(host, PLUGIN_VERSION_PATH);
+  const summarizeUrl = urlFromHost(host, SUMMARIZE_PATH);
   const ingestionUrl = urlFromHost(host, INGESTION_PATH);
 
   debugLog(`loadConfig: host=${host} rtgUrl=${rtgUrl}`);
@@ -94,6 +98,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, settingsPath?: 
 
   return {
     rtgUrl,
+    pluginVersionUrl,
+    summarizeUrl,
     authorization,
     agentId,
     // REVA_PDP_TIMEOUT_MS is a public, documented config variable — its

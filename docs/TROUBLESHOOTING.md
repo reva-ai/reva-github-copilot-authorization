@@ -61,7 +61,7 @@ Check in this order:
 5. **In VS Code, is the plugin loaded at all?** The chat's Session Target must be
    **Copilot**, and the plugin must be one VS Code can find — installed under
    `~/.copilot/installed-plugins/`, not only registered as a local-folder marketplace. Type
-   `/hooks` in the chat and check that the five `reva-security` hooks are listed. If no
+   `/hooks` in the chat and check that the six `reva-security` hooks are listed. If no
    new session id appears in `reva-debug.log`, the hooks are not running — see
    [DESKTOP-COMPATIBILITY.md](DESKTOP-COMPATIBILITY.md#which-surfaces-are-governed).
 
@@ -78,7 +78,9 @@ npm ci && npm run build
 
 An evaluation call can take up to `REVA_PDP_TIMEOUT_MS` (default 25 s) before the plugin
 gives up and blocks the action. The `preToolUse` and `postToolUse` hooks are themselves
-capped at 45 s by `hooks/hooks.json`.
+capped at 45 s by `hooks/hooks.json`. The end-of-turn `agentStop` hook, which closes the
+turn's trace in Reva, waits at most 5 s (and is capped at 10 s); it never blocks anything, and
+a failure shows only as a `stop: summarize failed …` line under `REVA_DEBUG=1`.
 
 If calls are routinely slow, lower `REVA_PDP_TIMEOUT_MS` — you are trading a longer stall
 for a sooner block on a slow link. It is read from the process environment only, not from
